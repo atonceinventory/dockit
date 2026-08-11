@@ -348,6 +348,9 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 }
 .gmc-red:active{border-color:#5e1111 #d88 #d88 #5e1111;box-shadow:none;transform:translate(1px,1px)}
 .gmc-sub{font-size:13px;font-style:italic;color:#3a3d63;margin-top:14px;line-height:1.5}
+.land-links{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px}
+.land-link{font-family:inherit;font-size:14px;color:#1e2352;text-decoration:underline;cursor:pointer;background:none;border:none;padding:0}
+.land-link:active{color:#a83232}
 .gmc-msg{font-size:14px;margin-top:14px;font-weight:700}
 .gmc-out{margin-top:18px;font-family:inherit;font-size:14px;background:#c7cade;border:3px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;padding:8px 16px;cursor:pointer;color:#1e2352;font-weight:700}
 
@@ -878,7 +881,7 @@ function initSync(){
 var lastAuthEmail = null;
 function onAuth(user){
   fbUser = user || null;
-  if(fbUser){ fbAuthMsg = ''; emailPrompt = false; }
+  if(fbUser){ fbAuthMsg = ''; emailPrompt = false; authMode = 'signin'; landPw = ''; }
   paintPill();
   if(fbUser && !isMember()){
     fbAuthMsg = 'This account (' + (fbUser.email||'') + ') is not on the shared board.';
@@ -896,6 +899,58 @@ function onAuth(user){
 
 var fbAuthMsg = '';
 var emailPrompt = false;   // link opened without a stored email -> ask for it
+var authMode = 'signin';   // 'signin' | 'create'
+var landEmail = '';        // preserved across re-renders
+var landPw = '';
+
+function isMemberEmail(email){
+  return MEMBER_EMAILS.map(function(e){return e.toLowerCase().trim();}).indexOf((email||'').toLowerCase().trim())!==-1;
+}
+
+function pwSignIn(){
+  var email=landEmail.trim(), pw=landPw;
+  if(!/.+@.+\..+/.test(email)){ fbAuthMsg='Check the email address.'; render(); return; }
+  if(!pw){ fbAuthMsg='Enter your password.'; render(); return; }
+  fbAuthMsg='Signing you in...'; render();
+  firebase.auth().signInWithEmailAndPassword(email,pw)
+    .then(function(){ fbAuthMsg=''; landPw=''; })
+    .catch(function(err){
+      var c=err&&err.code||'';
+      if(c==='auth/user-not-found'){ authMode='create'; fbAuthMsg='No account for that email yet. Pick a password to create one.'; render(); return; }
+      if(c==='auth/wrong-password'||c==='auth/invalid-credential'){ fbAuthMsg='Wrong password. Try again, or reset it below.'; render(); return; }
+      if(c==='auth/invalid-email'){ fbAuthMsg='That email does not look right.'; render(); return; }
+      if(c==='auth/too-many-requests'){ fbAuthMsg='Too many attempts. Wait a moment and try again.'; render(); return; }
+      fbAuthMsg='Sign-in failed: '+(err&&err.message||'unknown'); render();
+    });
+}
+
+function pwCreate(){
+  var email=landEmail.trim(), pw=landPw;
+  if(!/.+@.+\..+/.test(email)){ fbAuthMsg='Check the email address.'; render(); return; }
+  if(!pw||pw.length<6){ fbAuthMsg='Password needs at least 6 characters.'; render(); return; }
+  if(!isMemberEmail(email)){ fbAuthMsg='That email is not on the Angels list. Ask Griff to add it first.'; render(); return; }
+  fbAuthMsg='Creating your account...'; render();
+  firebase.auth().createUserWithEmailAndPassword(email,pw)
+    .then(function(){ fbAuthMsg=''; landPw=''; })
+    .catch(function(err){
+      var c=err&&err.code||'';
+      if(c==='auth/email-already-in-use'){ authMode='signin'; fbAuthMsg='You already have an account. Just sign in.'; render(); return; }
+      if(c==='auth/weak-password'){ fbAuthMsg='Password needs at least 6 characters.'; render(); return; }
+      fbAuthMsg='Could not create account: '+(err&&err.message||'unknown'); render();
+    });
+}
+
+function pwReset(){
+  var email=landEmail.trim();
+  if(!/.+@.+\..+/.test(email)){ fbAuthMsg='Type your email above, then tap reset.'; render(); return; }
+  firebase.auth().sendPasswordResetEmail(email)
+    .then(function(){ fbAuthMsg='Password reset link sent to '+email+'. Check your inbox.'; render(); })
+    .catch(function(err){
+      var c=err&&err.code||'';
+      if(c==='auth/user-not-found'){ fbAuthMsg='No account for that email yet. Create one below instead.'; authMode='create'; render(); return; }
+      fbAuthMsg='Could not send reset: '+(err&&err.message||'unknown'); render();
+    });
+}
 
 /* Send a one-time sign-in link to the email. */
 function sendLink(email){
@@ -1636,26 +1691,37 @@ function renderLanding(){
 
   var panel=document.createElement('div'); panel.className='gmc-panel';
   var bar=document.createElement('div'); bar.className='gmc-bar';
-  bar.textContent = emailPrompt ? 'Confirm your email' : 'Angels, sign in here';
+  bar.textContent = (authMode==='create') ? 'Set your password' : 'Angels, sign in here';
   panel.appendChild(bar);
   var body=document.createElement('div'); body.className='gmc-body';
 
-  if(emailPrompt){
-    var l0=document.createElement('label'); l0.textContent='Your email';
-    var e0=document.createElement('input'); e0.type='email'; e0.placeholder='you@example.com'; e0.autocomplete='email';
-    var g0=document.createElement('button'); g0.className='gmc-red'; g0.textContent='Finish sign-in';
-    g0.onclick=function(){ finishLink(e0.value); };
-    e0.onkeydown=function(ev){ if(ev.key==='Enter') finishLink(e0.value); };
-    body.appendChild(l0); body.appendChild(e0); body.appendChild(g0);
-  } else {
-    var l=document.createElement('label'); l.textContent='Email';
-    var em=document.createElement('input'); em.type='email'; em.placeholder='you@example.com'; em.autocomplete='email';
-    var go=document.createElement('button'); go.className='gmc-red'; go.textContent='Email me a link';
-    go.onclick=function(){ sendLink(em.value); };
-    em.onkeydown=function(ev){ if(ev.key==='Enter') sendLink(em.value); };
-    var sub=document.createElement('p'); sub.className='gmc-sub'; sub.textContent='A one-time sign-in link, no password. Open it on this device.';
-    body.appendChild(l); body.appendChild(em); body.appendChild(go); body.appendChild(sub);
+  var l1=document.createElement('label'); l1.textContent='Email';
+  var em=document.createElement('input'); em.type='email'; em.placeholder='you@example.com'; em.autocomplete='email'; em.value=landEmail;
+  em.oninput=function(){ landEmail=em.value; };
+  var l2=document.createElement('label'); l2.textContent='Password';
+  var pw=document.createElement('input'); pw.type='password'; pw.placeholder=(authMode==='create'?'Choose a password (6+ characters)':'Your password'); pw.autocomplete=(authMode==='create'?'new-password':'current-password'); pw.value=landPw;
+  pw.oninput=function(){ landPw=pw.value; };
+  pw.onkeydown=function(ev){ if(ev.key==='Enter'){ authMode==='create'?pwCreate():pwSignIn(); } };
+
+  var go=document.createElement('button'); go.className='gmc-red';
+  go.textContent = (authMode==='create') ? 'Create password' : 'Sign in';
+  go.onclick=function(){ authMode==='create'?pwCreate():pwSignIn(); };
+
+  var links=document.createElement('div'); links.className='land-links';
+  var toggle=document.createElement('button'); toggle.className='land-link';
+  toggle.textContent = (authMode==='create') ? 'Have an account? Sign in' : 'First time? Create a password';
+  toggle.onclick=function(){ authMode = (authMode==='create')?'signin':'create'; fbAuthMsg=''; render(); };
+  links.appendChild(toggle);
+  if(authMode!=='create'){
+    var forgot=document.createElement('button'); forgot.className='land-link';
+    forgot.textContent='Forgot password?';
+    forgot.onclick=function(){ pwReset(); };
+    links.appendChild(forgot);
   }
+
+  body.appendChild(l1); body.appendChild(em);
+  body.appendChild(l2); body.appendChild(pw);
+  body.appendChild(go); body.appendChild(links);
   if(fbAuthMsg){ var m=document.createElement('p'); m.className='gmc-msg'; m.style.color=/could not|fail|does not|not on/i.test(fbAuthMsg)?'#8b1a1a':'#3a3d63'; m.textContent=fbAuthMsg; body.appendChild(m); }
   panel.appendChild(body);
   w.appendChild(panel);
