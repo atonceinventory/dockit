@@ -303,7 +303,8 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .gmc-wordmark{text-align:center;margin:6px 0 30px}
 .gmc-wordmark .k{font-size:20px;font-weight:700;letter-spacing:.35em;color:#1e2352}
 .gmc-wordmark .big{font-size:52px;font-weight:700;line-height:.9;font-style:italic;color:#12143a;text-shadow:2px 2px 0 rgba(255,255,255,.4)}
-.gate-wrap{max-width:480px;margin:16px auto 24px;text-align:center}
+.gate-wrap{max-width:480px;margin:20px auto 24px;text-align:center}
+.brand-logo{display:block;margin:0 auto 4px;max-width:230px;width:60%;height:auto;filter:drop-shadow(2px 3px 0 rgba(20,22,50,.18))}
 .gate-svg{width:100%;max-width:440px;display:block;margin:0 auto;filter:drop-shadow(2px 3px 0 rgba(20,22,50,.18))}
 .gate-plaque{
   display:inline-block;margin-top:10px;background:#c7cade;
@@ -1617,28 +1618,8 @@ function renderLanding(){
   w.appendChild(head);
 
   var gate=document.createElement('div'); gate.className='gate-wrap';
-  var bars=[70,100,130,160,280,310,340,370];
-  var barsSvg = bars.map(function(x){
-    return '<line x1="'+x+'" y1="92" x2="'+x+'" y2="248"/>'
-         + '<path d="M'+x+' 82 l6 8 l-6 8 l-6 -8 Z" fill="#1e2352" stroke="none"/>';
-  }).join('');
   gate.innerHTML =
-    '<svg class="gate-svg" viewBox="0 0 440 262" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
-    + '<g fill="none" stroke="#1e2352" stroke-width="3" stroke-linecap="round">'
-      + '<path d="M40 80 Q40 20 220 20 Q400 20 400 80" stroke-width="4"/>'
-      + '<line x1="40" y1="80" x2="40" y2="250" stroke-width="5"/>'
-      + '<line x1="400" y1="80" x2="400" y2="250" stroke-width="5"/>'
-      + '<line x1="32" y1="250" x2="408" y2="250" stroke-width="6"/>'
-      + '<line x1="40" y1="170" x2="400" y2="170"/>'
-      + barsSvg
-      + '<circle cx="205" cy="170" r="6"/><circle cx="235" cy="170" r="6"/>'
-      + '<path d="M40 72 l7 10 l-7 10 l-7 -10 Z" fill="#1e2352" stroke="none"/>'
-      + '<path d="M400 72 l7 10 l-7 10 l-7 -10 Z" fill="#1e2352" stroke="none"/>'
-      + '<circle cx="220" cy="52" r="40" stroke-width="2"/>'
-      + '<circle cx="220" cy="52" r="34" fill="#b7bbd4" stroke-width="4"/>'
-    + '</g>'
-    + '<image href="/docket_logo.png" xlink:href="/docket_logo.png" x="192" y="24" width="56" height="56" preserveAspectRatio="xMidYMid meet"/>'
-    + '</svg>'
+      '<img class="brand-logo" src="/docket_logo.png" alt="Dockit">'
     + '<div class="gate-plaque">Private community \u00b7 Angels only</div>';
   w.appendChild(gate);
 
