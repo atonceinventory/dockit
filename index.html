@@ -341,6 +341,19 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .gmc-sub{font-size:13px;font-style:italic;color:#3a3d63;margin-top:14px;line-height:1.5}
 .land-links{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px}
 .splash-dots{font-family:'Times New Roman',Times,serif;font-style:italic;font-size:16px;color:#3a3d63;margin-top:8px}
+/* G settings dropdown */
+#gmenu{position:fixed;top:64px;right:18px;z-index:120;width:280px;background:#c7cade;border:3px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;box-shadow:5px 6px 0 rgba(20,22,50,.35);font-family:'Times New Roman',Times,serif}
+@media (min-width:900px){#gmenu{top:76px;right:24px}}
+.gmenu-head{display:flex;align-items:center;justify-content:space-between;background:#1e2352;color:#fff;padding:8px 12px;border-bottom:2px solid #0a0c28}
+.gmenu-head span{font-weight:700;font-size:15px}
+.gmenu-x{color:#fff;font-size:14px;padding:2px 6px;line-height:1}
+.gmenu-acct{padding:12px 14px 4px;font-size:14px;color:#1c1f4a}
+.gmenu-acct b{font-weight:700}
+.gmenu-status{padding:0 14px 10px;font-size:12px;font-style:italic;color:#3a3d63;border-bottom:1px solid rgba(30,35,82,.18)}
+.gmenu-item{display:block;width:100%;text-align:left;font-family:inherit;font-size:15px;color:#1c1f4a;padding:11px 14px;border-bottom:1px solid rgba(30,35,82,.12);background:none;cursor:pointer}
+.gmenu-item:hover{background:#d5d7e6}
+.gmenu-item:active{background:#1e2352;color:#fff}
+.gmenu-item.danger{color:#a83232;font-weight:700;border-bottom:none}
 .land-link{font-family:inherit;font-size:14px;color:#1e2352;text-decoration:underline;cursor:pointer;background:none;border:none;padding:0}
 .land-link:active{color:#a83232}
 
@@ -1871,8 +1884,6 @@ function renderPicker(){
     grid.appendChild(card);
   });
   wrap.appendChild(grid);
-  if(S.showSync) wrap.appendChild(utils());
-  if(S.showSync) wrap.appendChild(syncPanel());
   sheet.appendChild(wrap);
 }
 
@@ -2019,6 +2030,7 @@ function renderNotifs(){
 
 function render(){
   paintPill();
+  renderMenu();
 
   var top = document.getElementById('top');
   var pagesBar = document.getElementById('pages');
@@ -2060,9 +2072,27 @@ function render(){
   if(allowedLaneKeys().indexOf(hub)===-1){ hub=null; return render(); }
   S.filter = hub;                       // scope tasks to this business
   S.lane = hub;                         // capture routes here
-  var isGMC = (hub==='gmc');
-  pagesBar.style.display = isGMC ? '' : 'none';   // Projects/Alerts only for GMC
-  if(!isGMC) S.page='tasks';
+
+  // per-business tabs
+  var TABS = {
+    gmc:[['tasks','Tasks'],['projects','Projects'],['notifs','Alerts']],
+    pit:[['tasks','Tasks'],['grid','Grid']]
+  };
+  var tabs = TABS[hub] || null;
+  if(tabs){
+    pagesBar.style.display='';
+    pagesBar.innerHTML='';
+    tabs.forEach(function(tp){
+      var b=document.createElement('button'); b.dataset.page=tp[0]; b.textContent=tp[1];
+      if(S.page===tp[0]) b.setAttribute('aria-current','page');
+      pagesBar.appendChild(b);
+    });
+  } else {
+    pagesBar.style.display='none';
+  }
+  // keep S.page valid for this business
+  var validPages = (tabs||[['tasks']]).map(function(tp){return tp[0];});
+  if(validPages.indexOf(S.page)===-1) S.page='tasks';
 
   // business header (switch back to picker)
   var bh=document.getElementById('bizhead'); bh.innerHTML=''; bh.style.display='';
@@ -2073,16 +2103,11 @@ function render(){
   var bhName=document.createElement('span'); bhName.className='bizname'; bhName.textContent = L.name || hub.toUpperCase();
   bh.appendChild(bhBtn); bh.appendChild(bhName);
 
-  // page tabs highlight
-  document.querySelectorAll('#pages button').forEach(function(b){
-    if(b.dataset.page===S.page) b.setAttribute('aria-current','page');
-    else b.removeAttribute('aria-current');
-  });
-
   document.getElementById('taskChrome').style.display = (S.page==='tasks') ? '' : 'none';
 
   if(S.page==='projects'){ document.getElementById('headcount').textContent=''; renderProjects(); return; }
   if(S.page==='notifs'){ document.getElementById('headcount').textContent=''; renderNotifs(); return; }
+  if(S.page==='grid'){ document.getElementById('headcount').textContent=''; renderGridPage(); return; }
 
   var dockEl=document.getElementById('dock'); if(dockEl) dockEl.style.display='none';  // business is the scope
   var c=counts();
@@ -2107,9 +2132,7 @@ function render(){
     if(S.view==='today') sheet.appendChild(emptyState('Nothing due today','Give an entry a date and it shows up here when it is due. Type one in the bar, ending with a day like "fri" or a date like 25/12.'));
     else if(S.view==='upcoming') sheet.appendChild(emptyState('Nothing scheduled','Dated entries appear here, soonest first, so you can see what is coming.'));
     else sheet.appendChild(emptyState('Empty','Type into the bar above. Toggle Task or Note on the left, tap a lane tile to route it, or write #gmc in the line.'));
-    if(S.showSync) sheet.appendChild(utils());
     if(S.showLogos) sheet.appendChild(logoPanel());
-    if(S.showSync) sheet.appendChild(syncPanel());
     updateBadge(); return;
   }
 
@@ -2123,9 +2146,7 @@ function render(){
     grid.appendChild(laneBlock(l,t));
   });
   sheet.appendChild(grid);
-  if(S.showSync) sheet.appendChild(utils());
   if(S.showLogos) sheet.appendChild(logoPanel());
-  if(S.showSync) sheet.appendChild(syncPanel());
   updateBadge();
 }
 
@@ -2612,6 +2633,88 @@ function utils(){
   return u;
 }
 
+/* ═══ actions (used by the G settings menu) ═══════════════ */
+function doExport(){
+  var blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='dockit-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function doImport(){
+  var f=document.createElement('input'); f.type='file'; f.accept='.json,application/json';
+  f.onchange=function(){
+    var file=f.files[0]; if(!file) return;
+    var r=new FileReader();
+    r.onload=function(){
+      try{
+        var d=JSON.parse(r.result);
+        if(!d.tasks) throw new Error('bad file');
+        if(confirm('Replace everything currently in Dockit with this file?')){
+          S=d; if(!S.notes)S.notes=[]; if(!S.lane)S.lane='aoi'; if(!S.view)S.view='today'; if(!S.page)S.page='tasks'; if(!S.projects)S.projects=[];
+          save(); render();
+        }
+      }catch(err){ alert('That file is not a Dockit export.'); }
+    };
+    r.readAsText(file);
+  };
+  f.click();
+}
+function doClearDone(){
+  var n=S.tasks.filter(function(t){return t.done}).length;
+  if(!n){ alert('Nothing completed to clear.'); return; }
+  if(confirm('Remove '+n+' completed item'+(n>1?'s':'')+'?')){
+    S.tasks=S.tasks.filter(function(t){return !t.done}); save(); render();
+  }
+}
+
+/* ═══ G settings dropdown (corner menu) ═══════════════════ */
+function renderMenu(){
+  var m=document.getElementById('gmenu');
+  if(!m){ m=document.createElement('div'); m.id='gmenu'; document.body.appendChild(m); }
+  if(!S.showSync){ m.style.display='none'; m.innerHTML=''; return; }
+  m.style.display=''; m.innerHTML='';
+
+  var head=document.createElement('div'); head.className='gmenu-head';
+  var t=document.createElement('span'); t.textContent='Settings';
+  var x=document.createElement('button'); x.className='gmenu-x'; x.innerHTML='&#10005;'; x.title='Close';
+  x.onclick=function(){ S.showSync=false; save(); render(); };
+  head.appendChild(t); head.appendChild(x); m.appendChild(head);
+
+  var acct=document.createElement('div'); acct.className='gmenu-acct';
+  acct.innerHTML = fbUser ? ('\u2713 Signed in as <b>'+(fbUser.email||'')+'</b>') : 'Working offline on this device';
+  m.appendChild(acct);
+  if(fbUser){
+    var st=document.createElement('div'); st.className='gmenu-status';
+    st.textContent = 'Syncing automatically across your devices.';
+    m.appendChild(st);
+  }
+
+  function item(label, fn, cls){
+    var b=document.createElement('button'); b.className='gmenu-item'+(cls?' '+cls:'');
+    b.textContent=label; b.onclick=fn; m.appendChild(b);
+  }
+  if(fbUser) item('Sync now', function(){ pushRemote(true); setSync('sync'); });
+  item('Export backup', doExport);
+  item('Import backup', doImport);
+  item('Clear completed', doClearDone);
+  item(S.showLogos?'Hide lane logos':'Lane logos', function(){ S.showLogos=!S.showLogos; save(); render(); });
+  if(fbUser) item('Sign out', function(){ if(confirm('Sign out of Dockit?')) signOut(); }, 'danger');
+}
+
+/* ═══ PIT Grid page (owner) ═══════════════════════════════ */
+function renderGridPage(){
+  sheet.innerHTML='';
+  var w=document.createElement('div'); w.className='notif-wrap';
+  w.innerHTML =
+    '<h2>Instagram grid planner</h2>' +
+    '<p>Plan the @logistics_pit feed \u2014 drag photos into a 9-grid, preview the profile, and map out posts before they go live.</p>';
+  var open=document.createElement('button'); open.className='gmc-red'; open.style.marginTop='6px'; open.textContent='Open planner';
+  open.onclick=function(){ openIG(); };
+  w.appendChild(open);
+  sheet.appendChild(w);
+}
+
 /* ═══ nav ═════════════════════════════════════════════════ */
 document.getElementById('nav').addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
@@ -2641,9 +2744,7 @@ render();
 initSync();
 paintPill();
 document.getElementById('syncpill').onclick=function(){
-  S.showSync = true; S.showLogos = false; save(); render();
-  var p = document.querySelector('.sync-panel');
-  if(p) p.scrollIntoView({behavior:'smooth', block:'center'});
+  S.showSync = !S.showSync; if(S.showSync) S.showLogos=false; save(); render();
 };
 
 /* ═══ service worker ══════════════════════════════════════ */
