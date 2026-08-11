@@ -1,0 +1,38 @@
+// Docket security rules — shared workspace with a private PIT lane.
+//
+// Paste into: Firebase console > Firestore Database > Rules > Publish.
+// IMPORTANT: put Holly's real sign-in email in the member() list below,
+// and the SAME email in MEMBER_EMAILS inside index.html.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function owner() {
+      return request.auth != null
+        && request.auth.token.email.lower() == 'griffgamble1@gmail.com';
+    }
+
+    function member() {
+      return request.auth != null && request.auth.token.email.lower() in [
+        'griffgamble1@gmail.com',
+        'byhollyholiday@gmail.com'          // <-- Holly's sign-in email, lowercase
+      ];
+    }
+
+    // Shared board (AOI, AOM, GMC): any member reads and writes.
+    match /shared_board/main {
+      allow read, write: if member();
+    }
+
+    // Private board (PIT): only the owner. Holly's account is denied here.
+    match /private_board/pit {
+      allow read, write: if owner();
+    }
+
+    // Legacy per-user docs from the earlier single-user version (harmless).
+    match /docket/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
