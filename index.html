@@ -275,6 +275,51 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 }
 .empty p{font-size:14px;color:var(--fg-mut);max-width:38ch;margin:0 auto;line-height:1.55}
 
+/* ── landing / login front door ──────────── */
+.landing{min-height:80vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}
+.landing-card{
+  width:100%;max-width:420px;text-align:center;
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));
+  border:1px solid var(--line);border-radius:22px;padding:40px 30px;
+}
+.landing-card .halo{font-size:34px;color:var(--gmc);margin-bottom:6px;text-shadow:0 0 24px rgba(255,213,49,.5)}
+.landing-card h1{font-size:26px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+.landing-card .tag{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--fg-mut);margin-bottom:24px}
+.land-field{display:flex;gap:8px;flex-wrap:wrap}
+.land-field input{flex:1;min-width:160px;background:var(--bg);border:1px solid var(--line-2);border-radius:11px;color:var(--fg);font-size:15px;padding:12px 13px}
+.land-field button{background:var(--gmc);color:#1a1a1a;font-weight:700;font-size:14px;border-radius:11px;padding:12px 16px;white-space:nowrap}
+.land-sub{font-size:12px;color:var(--fg-dim);margin-top:14px;line-height:1.5}
+.land-hint{font-size:13px;color:var(--fg-mut);margin-bottom:14px}
+.land-msg{font-size:13px;margin-top:14px;line-height:1.5}
+.land-out{margin-top:20px;border:1px solid var(--line-2);border-radius:10px;color:var(--fg-mut);padding:10px 16px;font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+
+/* ── business picker ─────────────────────── */
+.picker{padding:8px 0 40px}
+.picker-h{margin:8px 2px 20px}
+.picker-h h2{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.picker-h p{font-family:var(--mono);font-size:11px;color:var(--fg-dim);margin-top:4px}
+.picker-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media (min-width:900px){ .picker-grid{grid-template-columns:repeat(4,1fr);gap:16px} }
+.pick-card{
+  display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;
+  background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--full);
+  border-radius:16px;padding:26px 14px;transition:transform .1s,border-color .1s;
+}
+.pick-card:active{transform:scale(.98)}
+.pick-card:hover{border-color:var(--line-2)}
+.pick-mark{width:56px;height:56px;border-radius:14px;overflow:hidden;background:var(--full);display:flex;align-items:center;justify-content:center}
+.pick-mark img{width:100%;height:100%;object-fit:cover}
+.pick-mark b{color:#fff;font-weight:800;font-size:17px}
+.pick-name{font-size:15px;font-weight:600}
+.pick-sub{font-family:var(--mono);font-size:10px;letter-spacing:.02em;color:var(--fg-mut)}
+
+/* ── business header (switch back) ───────── */
+#bizhead{display:flex;align-items:center;gap:12px;padding:4px var(--pad) 0}
+.bizback{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--fg-mut);border:1px solid var(--line-2);border-radius:9px;padding:7px 12px}
+.bizback:active{color:var(--fg)}
+.bizname{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--fg)}
+@media (min-width:900px){ #bizhead{max-width:1160px;margin:0 auto} }
+
 /* ── page switcher ───────────────────────── */
 .pages{display:flex;gap:6px;margin:2px var(--pad) 0;padding:0 0 2px}
 .pages button{
@@ -603,7 +648,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 <body>
 <div class="app">
 
-<div class="top">
+<div class="top" id="top">
   <header class="bar">
     <h1>Docket</h1>
     <span class="sub" id="datestamp"></span>
@@ -616,6 +661,8 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
     <button data-page="projects">Projects</button>
     <button data-page="notifs">Alerts</button>
   </div>
+
+  <div id="bizhead"></div>
 
   <div id="taskChrome">
     <nav id="nav">
@@ -770,18 +817,21 @@ function initSync(){
   completeEmailLink();
 }
 
+var lastAuthEmail = null;
 function onAuth(user){
   fbUser = user || null;
   if(fbUser){ fbAuthMsg = ''; emailPrompt = false; }
   paintPill();
   if(fbUser && !isMember()){
-    // signed in, but this email is not on the shared board
-    fbAuthMsg = 'This account (' + (fbUser.email||'') + ') is not on the shared board. Ask Griff to add it, or sign in with the right email.';
-    setSync('err');
-    if(S.showSync) render();
-    return;
+    fbAuthMsg = 'This account (' + (fbUser.email||'') + ') is not on the shared board.';
+    setSync('err'); render(); return;
   }
-  if(S.showSync) render();
+  if(fbUser){
+    if(fbUser.email !== lastAuthEmail){ hub=null; lastAuthEmail=fbUser.email; }  // fresh login -> picker
+  } else {
+    hub=null; lastAuthEmail=null;    // signed out -> landing
+  }
+  render();
   if(fbUser){ subscribe(); }
   else { if(fbUnsub){ fbUnsub(); fbUnsub=null; } if(fbUnsubP){ fbUnsubP(); fbUnsubP=null; } setSync('local'); }
 }
@@ -971,6 +1021,7 @@ if(!S.logos) S.logos={}; if(S.filter===undefined) S.filter=null;
 if(!S.kind) S.kind='task';               // what the capture bar adds
 if(!S.page) S.page='tasks';              // tasks | projects | notifs
 if(!S.projects) S.projects=[];           // GMC project tracker (shared)
+var hub = null;                          // chosen business (null = picker); not persisted
 LANES.forEach(function(l){ if(!S.logos[l.k] && DEFAULT_LOGOS[l.k]) S.logos[l.k]=DEFAULT_LOGOS[l.k]; });
 
 /* ── one-time migration to the unified, dated model ──────────
@@ -1504,6 +1555,78 @@ function emptyState(title, body){
   return d;
 }
 
+/* ═══ landing / login (front door) ════════════════════════ */
+function renderLanding(){
+  sheet.innerHTML='';
+  var w=document.createElement('div'); w.className='landing';
+  var card=document.createElement('div'); card.className='landing-card';
+  card.innerHTML =
+    '<div class="halo">\u2727</div>' +
+    '<h1>personal dockit</h1>' +
+    '<p class="tag">Angels, sign in here</p>';
+
+  if(emailPrompt){
+    var hp=document.createElement('p'); hp.className='land-hint'; hp.textContent='Confirm the email you requested the link with.';
+    var f0=document.createElement('div'); f0.className='land-field';
+    var e0=document.createElement('input'); e0.type='email'; e0.placeholder='you@example.com'; e0.autocomplete='email';
+    var g0=document.createElement('button'); g0.textContent='Finish sign-in';
+    g0.onclick=function(){ finishLink(e0.value); };
+    e0.onkeydown=function(ev){ if(ev.key==='Enter') finishLink(e0.value); };
+    f0.appendChild(e0); f0.appendChild(g0);
+    card.appendChild(hp); card.appendChild(f0);
+  } else {
+    var f=document.createElement('div'); f.className='land-field';
+    var em=document.createElement('input'); em.type='email'; em.placeholder='you@example.com'; em.autocomplete='email';
+    var go=document.createElement('button'); go.textContent='Email me a link';
+    go.onclick=function(){ sendLink(em.value); };
+    em.onkeydown=function(ev){ if(ev.key==='Enter') sendLink(em.value); };
+    f.appendChild(em); f.appendChild(go);
+    var sub=document.createElement('p'); sub.className='land-sub'; sub.textContent='A one-time sign-in link, no password. Open it on this device.';
+    card.appendChild(f); card.appendChild(sub);
+  }
+  if(fbAuthMsg){ var m=document.createElement('p'); m.className='land-msg'; m.style.color=/could not|fail|does not|not on/i.test(fbAuthMsg)?'#ff6257':'#9c9ca6'; m.textContent=fbAuthMsg; card.appendChild(m); }
+  w.appendChild(card);
+  sheet.appendChild(w);
+}
+
+function renderNotAuthorised(){
+  sheet.innerHTML='';
+  var w=document.createElement('div'); w.className='landing';
+  var card=document.createElement('div'); card.className='landing-card';
+  card.innerHTML='<h1>Not on the team</h1><p class="tag">'+(fbUser&&fbUser.email||'')+' isn\'t on this workspace.</p>';
+  var out=document.createElement('button'); out.className='land-out'; out.textContent='Sign out';
+  out.onclick=function(){ signOut(); };
+  card.appendChild(out); w.appendChild(card); sheet.appendChild(w);
+}
+
+/* ═══ business picker ═════════════════════════════════════ */
+function renderPicker(){
+  sheet.innerHTML='';
+  var wrap=document.createElement('div'); wrap.className='picker';
+  var h=document.createElement('div'); h.className='picker-h';
+  h.innerHTML='<h2>Choose a workspace</h2><p>Signed in as '+(fbUser&&fbUser.email||'')+'</p>';
+  wrap.appendChild(h);
+  var grid=document.createElement('div'); grid.className='picker-grid';
+  visibleLanes().forEach(function(l){
+    var openN = S.tasks.filter(function(t){ return t.lane===l.k && !t.done; }).length;
+    var card=document.createElement('button'); card.className='pick-card'; card.style.setProperty('--full', l.full);
+    var mk=document.createElement('span'); mk.className='pick-mark';
+    if(S.logos[l.k]){ var im=document.createElement('img'); im.src=S.logos[l.k]; mk.appendChild(im); }
+    else { var b=document.createElement('b'); b.textContent=l.code; mk.appendChild(b); }
+    var nm=document.createElement('span'); nm.className='pick-name'; nm.textContent=l.name;
+    var sub=document.createElement('span'); sub.className='pick-sub';
+    sub.textContent = openN + ' open' + (l.k==='gmc' ? ' \u00b7 projects \u00b7 alerts' : '');
+    card.appendChild(mk); card.appendChild(nm); card.appendChild(sub);
+    card.onclick=function(){ hub=l.k; S.page='tasks'; render(); window.scrollTo(0,0); };
+    grid.appendChild(card);
+  });
+  wrap.appendChild(grid);
+  wrap.appendChild(utils());
+  if(S.showSync) wrap.appendChild(syncPanel());
+  sheet.appendChild(wrap);
+}
+
+
 /* ═══ Projects tracker (GMC) ══════════════════════════════ */
 var PSTATUS = [['notstarted','Not started'],['inprogress','In progress'],['review','Needs review'],['hold','On hold'],['complete','Complete']];
 var PPRIO = [['high','High'],['medium','Medium'],['low','Low']];
@@ -1645,20 +1768,66 @@ function renderNotifs(){
 
 
 function render(){
+  paintPill();
+
+  var top = document.getElementById('top');
+  var pagesBar = document.getElementById('pages');
+  var bizhead = document.getElementById('bizhead');
+  if(bizhead) bizhead.style.display='none';
+
+  // ── 1. not signed in -> branded landing/login ──
+  if(fbConfigured() && !fbUser){
+    top.style.display='none';
+    renderLanding();
+    return;
+  }
+  // signed in but not on the team
+  if(fbUser && !isMember()){
+    top.style.display='none';
+    renderNotAuthorised();
+    return;
+  }
+  top.style.display='';
+
+  // ── 2. signed in, no business chosen -> business picker ──
+  if(!hub){
+    document.getElementById('taskChrome').style.display='none';
+    pagesBar.style.display='none';
+    document.getElementById('headcount').textContent='';
+    renderPicker();
+    return;
+  }
+
+  // ── 3. inside a business ──
+  // force allowed hub; PIT only for owner
+  if(allowedLaneKeys().indexOf(hub)===-1){ hub=null; return render(); }
+  S.filter = hub;                       // scope tasks to this business
+  S.lane = hub;                         // capture routes here
+  var isGMC = (hub==='gmc');
+  pagesBar.style.display = isGMC ? '' : 'none';   // Projects/Alerts only for GMC
+  if(!isGMC) S.page='tasks';
+
+  // business header (switch back to picker)
+  var bh=document.getElementById('bizhead'); bh.innerHTML=''; bh.style.display='';
+  var bhBtn=document.createElement('button'); bhBtn.className='bizback';
+  var L = LANE[hub] || {name:hub};
+  bhBtn.innerHTML='&#8249; Businesses';
+  bhBtn.onclick=function(){ hub=null; S.filter=null; render(); window.scrollTo(0,0); };
+  var bhName=document.createElement('span'); bhName.className='bizname'; bhName.textContent = L.name || hub.toUpperCase();
+  bh.appendChild(bhBtn); bh.appendChild(bhName);
+
   // page tabs highlight
   document.querySelectorAll('#pages button').forEach(function(b){
     if(b.dataset.page===S.page) b.setAttribute('aria-current','page');
     else b.removeAttribute('aria-current');
   });
-  paintPill();
 
-  // task-only chrome (nav + capture + dock) shows only on the Tasks page
   document.getElementById('taskChrome').style.display = (S.page==='tasks') ? '' : 'none';
 
   if(S.page==='projects'){ document.getElementById('headcount').textContent=''; renderProjects(); return; }
   if(S.page==='notifs'){ document.getElementById('headcount').textContent=''; renderNotifs(); return; }
 
-  renderDock();
+  var dockEl=document.getElementById('dock'); if(dockEl) dockEl.style.display='none';  // business is the scope
   var c=counts();
   document.getElementById('headcount').textContent = c.all + ' open';
   document.getElementById('b-today').textContent = c.today || '';
