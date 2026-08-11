@@ -17,38 +17,38 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* dark surfaces */
-  --bg:#141416;
-  --surface:#1C1C20;
-  --surface-2:#25252B;
-  --surface-3:#2E2E35;
-  --line:rgba(255,255,255,.08);
-  --line-2:rgba(255,255,255,.16);
+  /* GMC light surfaces (periwinkle + panel greys) */
+  --bg:#b7bbd4;
+  --surface:#c7cade;
+  --surface-2:#cfd2e2;
+  --surface-3:#d8dae8;
+  --line:rgba(30,35,82,.22);
+  --line-2:rgba(30,35,82,.38);
 
-  /* text */
-  --fg:#ECECEF;
-  --fg-mut:#9C9CA6;
-  --fg-dim:rgba(255,255,255,.40);
+  /* navy ink text */
+  --fg:#1c1f4a;
+  --fg-mut:#3a3d63;
+  --fg-dim:rgba(28,31,74,.5);
 
   /* legacy names remapped so existing markup keeps working */
   --ink:var(--fg);
-  --ink-72:rgba(236,236,239,.72);
-  --ink-60:rgba(236,236,239,.58);
-  --ink-38:rgba(236,236,239,.36);
-  --ink-14:rgba(255,255,255,.12);
-  --ink-08:rgba(255,255,255,.06);
-  --paper:#ECECEF;
+  --ink-72:rgba(28,31,74,.78);
+  --ink-60:rgba(28,31,74,.6);
+  --ink-38:rgba(28,31,74,.4);
+  --ink-14:rgba(30,35,82,.16);
+  --ink-08:rgba(30,35,82,.08);
+  --paper:#1c1f4a;
 
-  --stamp:#FF6257;
+  --navy:#1e2352;
+  --stamp:#a83232;
 
-  /* brand accents (brightened a touch for dark legibility) */
-  --aoi:#3FAEFF; --aom:#FF5247; --gmc:#FFD531; --pit:#5A64F2;
-  /* subtle brand washes for row backgrounds on dark */
-  --aoi-t:rgba(63,174,255,.10); --aom-t:rgba(255,82,71,.10);
-  --gmc-t:rgba(255,213,49,.10); --pit-t:rgba(90,100,242,.12);
+  /* brand accents (kept for lane identity) */
+  --aoi:#2f7fd6; --aom:#d63b31; --gmc:#c99a1e; --pit:#3b45c7;
+  --aoi-t:rgba(47,127,214,.12); --aom-t:rgba(214,59,49,.12);
+  --gmc-t:rgba(201,154,30,.14); --pit-t:rgba(59,69,199,.12);
 
-  --sans:'Archivo',system-ui,-apple-system,sans-serif;
-  --mono:'DM Mono',ui-monospace,Menlo,monospace;
+  --sans:'Times New Roman',Times,Georgia,serif;
+  --mono:'Times New Roman',Times,Georgia,serif;
 
   --pad:16px;
   --nav:calc(58px + env(safe-area-inset-bottom,0px));
@@ -306,7 +306,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .gmc-wordmark .k{font-size:20px;font-weight:700;letter-spacing:.35em;color:#1e2352}
 .gmc-wordmark .big{font-size:52px;font-weight:700;line-height:.9;font-style:italic;color:#12143a;text-shadow:2px 2px 0 rgba(255,255,255,.4)}
 .gate-wrap{max-width:520px;width:100%;margin:40px auto 0;text-align:center}
-.brand-logo{display:block;margin:0 auto 12px;width:auto;max-width:88%;height:96px;object-fit:contain;object-position:center;filter:drop-shadow(2px 3px 0 rgba(20,22,50,.18))}
+.brand-logo{display:block;margin:0 auto 24px;width:auto;max-width:88%;height:96px;object-fit:contain;object-position:center;filter:drop-shadow(2px 3px 0 rgba(20,22,50,.18))}
 .gate-svg{width:100%;max-width:440px;display:block;margin:0 auto;filter:drop-shadow(2px 3px 0 rgba(20,22,50,.18))}
 .gate-plaque{
   display:inline-block;margin:0;background:#c7cade;
@@ -315,12 +315,12 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
   box-shadow:2px 2px 0 rgba(20,22,50,.25);
 }
 .gmc-panel{
-  max-width:500px;width:100%;margin:12px auto 40px;background:#c7cade;
+  max-width:500px;width:100%;margin:24px auto 40px;background:#c7cade;
   border:3px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;
   box-shadow:4px 4px 0 rgba(20,22,50,.25);
 }
 .gate-plaque{
-  display:inline-block;margin-top:10px;background:#c7cade;
+  display:inline-block;margin:0;background:#c7cade;
   border:3px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;
   padding:5px 16px;font-style:italic;font-weight:700;color:#1e2352;
   box-shadow:2px 2px 0 rgba(20,22,50,.25);
@@ -719,6 +719,72 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 @media (max-width:899px){ .grid{display:block} }
 
 @media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+/* ═══ GMC THEME — app-wide beveled skin ═══════════════════ */
+body{ -webkit-font-smoothing:auto; }
+.app{ background:var(--bg); }
+
+/* top chrome + bars */
+.bar h1{ font-weight:700; }
+.bar .sub, .bar .count, .lane-head .full, .lane-head .n, .meta, .due, .act, .caphint, .pcard-meta, .pf, .ig-hint, nav button, .pages button{ font-family:var(--sans)!important; }
+
+/* page tabs + view nav -> beveled */
+.pages{ border-bottom:2px solid var(--navy); }
+.pages button[aria-current="page"]{ background:var(--surface); color:var(--navy); border:2px solid; border-color:#eef0fb #6a6d82 transparent #eef0fb; }
+nav{ background:var(--surface); border:2px solid; border-color:#6a6d82 #eef0fb #eef0fb #6a6d82; border-radius:0; padding:5px; }
+nav button{ border-radius:0; font-size:15px; color:var(--fg-mut); }
+nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
+#bizhead{ }
+.bizback{ background:var(--surface); border:2px solid; border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb; border-radius:0; color:var(--navy); font-weight:700; }
+.bizname{ color:var(--navy); font-size:15px; }
+
+/* capture bar -> beveled inset */
+.capture-row{ background:var(--surface); border:2px solid; border-color:#6a6d82 #eef0fb #eef0fb #6a6d82; border-radius:0; }
+.capture-row .kind{ background:var(--navy); color:#fff; border-radius:0; }
+.capture-row .kind[data-kind="note"]{ background:var(--gmc); color:#1a1a1a; }
+#cap{ color:var(--fg); }
+.capture-row .datebtn{ border:2px solid; border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb; border-radius:0; background:var(--surface-2); }
+
+/* business picker cards + dock tiles -> beveled panels */
+.pick-card, .tile{ background:var(--surface); border:3px solid!important; border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb!important; border-radius:0!important; box-shadow:3px 3px 0 rgba(20,22,50,.2); }
+.pick-card{ border-top-width:3px; }
+.pick-mark, .tile .mark b, .lane-head .swatch{ border-radius:0; }
+.picker-h h2, .proj-head h2{ color:var(--navy); font-weight:700; }
+
+/* task rows -> light beveled cards with brand spine */
+.row{ background:var(--surface); border:2px solid; border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb; border-left:5px solid var(--tint); border-radius:0; box-shadow:2px 2px 0 rgba(20,22,50,.15); }
+.row.is-note{ background:linear-gradient(var(--tint-l),var(--tint-l)),var(--surface); }
+.txt{ color:var(--fg); }
+.box, .dogear{ border-color:var(--navy); border-radius:0; }
+.act{ border:2px solid; border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb; border-radius:0; color:var(--navy); }
+.act.on{ background:var(--navy); color:#fff; border-color:#4a4f80 #0a0c28 #0a0c28 #4a4f80; }
+.due{ border-radius:0; border:1px solid var(--line-2); }
+
+/* lane header bar -> navy */
+.lane-head h2{ color:var(--navy); }
+
+/* red action buttons (new project, etc.) -> GMC red bevel */
+.proj-head .newp, .ptask-add:active{ background:var(--stamp); color:#fff; border:3px solid; border-color:#d88 #5e1111 #5e1111 #d88; border-radius:0; box-shadow:2px 2px 0 rgba(20,22,50,.3); font-weight:700; }
+.newp{ border-radius:0; }
+
+/* panels: sync, logos, project cards, sheets -> beveled */
+.sync-panel, .logos, .pcard, .detail, .cal, .ptask, .empty{
+  background:var(--surface); border:3px solid; border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb; border-radius:0;
+}
+.pcard{ border-left:5px solid var(--gmc); box-shadow:2px 2px 0 rgba(20,22,50,.15); }
+.sync-panel .go{ background:var(--navy); color:#fff; border-radius:0; border:3px solid; border-color:#4a4f80 #0a0c28 #0a0c28 #4a4f80; }
+.detail-title, .pname{ color:var(--navy); }
+.utils button{ border:2px solid; border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb; border-radius:0; color:var(--navy); background:var(--surface); }
+
+/* status pill / avatar */
+.bar .sync{ border-radius:0; border:2px solid; border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb; color:var(--navy); }
+.bar .sync.avatar{ border-radius:50%; }
+
+/* project status/priority tags keep their colour coding but square off */
+.pf{ border-radius:0; }
+.pbar, .pbar span{ border-radius:0; }
+
+/* headings in navy */
+.empty strong{ color:var(--navy); }
 </style>
 </head>
 <body>
