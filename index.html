@@ -774,6 +774,19 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
 
 /* headings in navy */
 .empty strong{ color:var(--navy); }
+
+/* bar: logo left, date + avatar right */
+.bar{ display:flex; align-items:center; gap:12px; }
+.bar-logo-wrap{ display:flex; align-items:center; flex:none; }
+.bar-logo{ height:38px; width:auto; max-width:180px; object-fit:contain; display:block; }
+.bar-right{ margin-left:auto; display:flex; align-items:center; gap:14px; }
+.bar-right .count{ margin-left:0; }
+@media (min-width:900px){ .bar-logo{ height:44px; } }
+
+/* centered picker */
+.picker{ max-width:1080px; margin:0 auto; }
+.picker-grid{ justify-content:center; }
+@media (min-width:900px){ .picker-grid{ grid-template-columns:repeat(4,minmax(0,240px)); justify-content:center; } }
 </style>
 </head>
 <body>
@@ -781,10 +794,12 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
 
 <div class="top" id="top">
   <header class="bar">
-    <h1>Docket</h1>
-    <span class="sub" id="datestamp"></span>
-    <button class="sync" id="syncpill" data-state="local" title="Sync status"></button>
-    <span class="count" id="headcount"></span>
+    <a class="bar-logo-wrap" href="#" onclick="return false"><img class="bar-logo" src="/docket_logo.png" alt="Dockit"></a>
+    <div class="bar-right">
+      <span class="count" id="headcount"></span>
+      <span class="sub" id="datestamp"></span>
+      <button class="sync" id="syncpill" data-state="local" title="Account and sync"></button>
+    </div>
   </header>
 
   <div class="pages" id="pages">
@@ -1834,7 +1849,7 @@ function renderPicker(){
     grid.appendChild(card);
   });
   wrap.appendChild(grid);
-  wrap.appendChild(utils());
+  if(S.showSync) wrap.appendChild(utils());
   if(S.showSync) wrap.appendChild(syncPanel());
   sheet.appendChild(wrap);
 }
@@ -2063,7 +2078,7 @@ function render(){
     if(S.view==='today') sheet.appendChild(emptyState('Nothing due today','Give an entry a date and it shows up here when it is due. Type one in the bar, ending with a day like "fri" or a date like 25/12.'));
     else if(S.view==='upcoming') sheet.appendChild(emptyState('Nothing scheduled','Dated entries appear here, soonest first, so you can see what is coming.'));
     else sheet.appendChild(emptyState('Empty','Type into the bar above. Toggle Task or Note on the left, tap a lane tile to route it, or write #gmc in the line.'));
-    sheet.appendChild(utils());
+    if(S.showSync) sheet.appendChild(utils());
     if(S.showLogos) sheet.appendChild(logoPanel());
     if(S.showSync) sheet.appendChild(syncPanel());
     updateBadge(); return;
@@ -2079,7 +2094,7 @@ function render(){
     grid.appendChild(laneBlock(l,t));
   });
   sheet.appendChild(grid);
-  sheet.appendChild(utils());
+  if(S.showSync) sheet.appendChild(utils());
   if(S.showLogos) sheet.appendChild(logoPanel());
   if(S.showSync) sheet.appendChild(syncPanel());
   updateBadge();
