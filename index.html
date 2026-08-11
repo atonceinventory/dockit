@@ -184,7 +184,7 @@ nav button[aria-current="page"] .badge{color:var(--aoi)}
 
 /* ── views ───────────────────────────────── */
 main{padding:0 var(--pad) calc(var(--nav) + 24px)}
-.sheet{max-width:1180px;margin:0 auto}
+.sheet{max-width:none;margin:0}
 
 .lane{margin-top:22px}
 .lane-head{display:flex;align-items:center;gap:9px;padding:0 2px 8px}
@@ -397,7 +397,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .bizback{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--fg-mut);border:1px solid var(--line-2);border-radius:9px;padding:7px 12px}
 .bizback:active{color:var(--fg)}
 .bizname{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--fg)}
-@media (min-width:900px){ #bizhead{max-width:1160px;margin:0 auto} }
+@media (min-width:900px){ #bizhead{max-width:none;margin:0} }
 
 /* ── page switcher ───────────────────────── */
 .pages{display:flex;gap:6px;margin:2px var(--pad) 0;padding:0 0 2px}
@@ -694,7 +694,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 
   /* kanban: four lanes across the full width, each a scannable column */
   .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:start}
-  .grid.solo{grid-template-columns:minmax(0,860px)}
+  .grid.solo{grid-template-columns:minmax(0,1fr)}
   .grid .lane{margin-top:0}
   .lane-head{padding-bottom:10px}
   .lane-head h2{font-size:14px}
@@ -710,7 +710,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
   .chev{font-size:18px}
 
   main{padding-bottom:52px}
-  .empty{max-width:860px;margin-left:auto;margin-right:auto}
+  .empty{max-width:860px;margin-left:0;margin-right:auto}
   /* footer panels stay readable, not stretched edge to edge */
   .utils,.logos,.sync-panel,.sync-panel .field{max-width:1000px}
 }
@@ -2698,7 +2698,6 @@ function renderMenu(){
   item('Export backup', doExport);
   item('Import backup', doImport);
   item('Clear completed', doClearDone);
-  item(S.showLogos?'Hide lane logos':'Lane logos', function(){ S.showLogos=!S.showLogos; save(); render(); });
   if(fbUser) item('Sign out', function(){ if(confirm('Sign out of Dockit?')) signOut(); }, 'danger');
 }
 
