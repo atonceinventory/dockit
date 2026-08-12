@@ -354,6 +354,23 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .gmenu-item:hover{background:#d5d7e6}
 .gmenu-item:active{background:#1e2352;color:#fff}
 .gmenu-item.danger{color:#a83232;font-weight:700;border-bottom:none}
+/* job alerts */
+.as-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.as-what{flex:2;min-width:200px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
+.as-where{flex:1;min-width:120px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
+.as-go{font-family:var(--sans);font-weight:700;font-size:14px;color:#fff;background:#1e2352;padding:9px 16px;border:2px solid;border-color:#4a4f80 #0a0c28 #0a0c28 #4a4f80;cursor:pointer}
+.as-go:active{transform:translate(1px,1px)}
+.as-del{font-family:var(--sans);color:var(--fg-dim);font-size:14px;padding:6px 9px;cursor:pointer}
+.as-del:active{color:#a83232}
+.as-results{margin-top:12px}
+.as-hint,.as-setup{font-family:var(--sans);font-size:13px;font-style:italic;color:#3a3d63;padding:8px 2px}
+.as-setup{font-style:normal;background:rgba(201,154,30,.18);border:1px solid rgba(30,35,82,.2);padding:11px 12px}
+.job{display:block;padding:11px 12px;margin-bottom:8px;background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--gmc);text-decoration:none;color:var(--fg)}
+.job:hover{background:#d5d7e6}
+.job-new{border-left-color:#a83232}
+.job-t{font-family:var(--sans);font-size:15.5px;font-weight:600;color:#12143a}
+.job-m{font-family:var(--sans);font-size:12.5px;color:#3a3d63;margin-top:3px}
+.job-badge{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.06em;background:#a83232;color:#fff;padding:1px 6px;vertical-align:middle}
 .land-link{font-family:inherit;font-size:14px;color:#1e2352;text-decoration:underline;cursor:pointer;background:none;border:none;padding:0}
 .land-link:active{color:#a83232}
 
@@ -1115,7 +1132,8 @@ function docRefPrivate(){ return fbDb.collection('private_board').doc('pit'); }
 function sharedPayload(){
   return {
     tasks: S.tasks.filter(function(t){ return SHARED_LANES.indexOf(t.lane)!==-1; }),
-    projects: S.projects || []
+    projects: S.projects || [],
+    alertSearches: S.alertSearches || []
   };
 }
 function privatePayload(){
@@ -1133,6 +1151,9 @@ function applyRemoteScope(data, laneKeys){
   // projects ride with the shared document (GMC)
   if(laneKeys.indexOf('gmc')!==-1 && Array.isArray(data.projects)){
     S.projects = data.projects;
+  }
+  if(laneKeys.indexOf('gmc')!==-1 && Array.isArray(data.alertSearches)){
+    S.alertSearches = data.alertSearches;
   }
   saveLocal();
   render();
@@ -1241,6 +1262,8 @@ if(!S.logos) S.logos={}; if(S.filter===undefined) S.filter=null;
 if(!S.kind) S.kind='task';               // what the capture bar adds
 if(!S.page) S.page='tasks';              // tasks | projects | notifs
 if(!S.projects) S.projects=[];           // GMC project tracker (shared)
+if(!S.alertSearches) S.alertSearches=[];  // GMC job-alert searches (shared)
+if(!S.alertsSeen) S.alertsSeen={};        // job id -> true (for NEW badges, local)
 var hub = null;                          // chosen business (null = picker); not persisted
 LANES.forEach(function(l){ if(!S.logos[l.k] && DEFAULT_LOGOS[l.k]) S.logos[l.k]=DEFAULT_LOGOS[l.k]; });
 
@@ -2015,16 +2038,101 @@ function projectTaskRow(p,t){
 /* ═══ Alerts / notification centre (placeholder) ══════════ */
 function renderNotifs(){
   sheet.innerHTML='';
-  var w=document.createElement('div'); w.className='notif-wrap';
-  w.innerHTML =
-    '<h2>Alerts</h2>' +
-    '<p>This is where job and client alerts will land \u2014 new roles matching your searches, delivered into Docket so you and Holly see them in one place.</p>' +
-    '<div class="notif-card">' +
-      '<h3>Coming next</h3>' +
-      '<p>To pull listings in safely and reliably, this connects to official job feeds and APIs (for example Adzuna for AU jobs, or a saved-search email alert) rather than scraping Seek or LinkedIn directly \u2014 scraping breaks constantly and is against their terms. Tell Claude the exact searches you want (role, location, keywords) and it will wire up a live feed here.</p>' +
-    '</div>';
-  sheet.appendChild(w);
+
+  var head=document.createElement('div'); head.className='proj-head';
+  var h=document.createElement('h2'); h.textContent='Job Alerts';
+  var sub=document.createElement('span'); sub.className='sub'; sub.textContent=(S.alertSearches.length)+' search'+(S.alertSearches.length===1?'':'es');
+  var nb=document.createElement('button'); nb.className='newp'; nb.textContent='+ New search';
+  nb.onclick=function(){ addAlertSearch(); };
+  head.appendChild(h); head.appendChild(sub); head.appendChild(nb);
+  sheet.appendChild(head);
+
+  if(!S.alertSearches.length){
+    sheet.appendChild(emptyState('No searches yet','Add a job search \u2014 a role and a location \u2014 and Dockit pulls matching listings from Adzuna into here. Shared with your GMC team.'));
+    return;
+  }
+
+  S.alertSearches.forEach(function(q){ sheet.appendChild(alertSearchCard(q)); });
 }
+
+function addAlertSearch(){
+  var q={ id:uid(), what:'', where:'Perth', created:Date.now() };
+  S.alertSearches.unshift(q); save(); render();
+  setTimeout(function(){ var el=document.querySelector('[data-qid="'+q.id+'"] .as-what'); if(el) el.focus(); },30);
+}
+
+function alertSearchCard(q){
+  var card=document.createElement('div'); card.className='pcard'; card.style.cursor='default'; card.setAttribute('data-qid',q.id);
+
+  var row=document.createElement('div'); row.className='as-row';
+  var what=document.createElement('input'); what.className='as-what'; what.placeholder='Role or keywords (e.g. Shopify developer)'; what.value=q.what||'';
+  what.onchange=function(){ q.what=what.value; save(); };
+  what.onkeydown=function(e){ if(e.key==='Enter'){ q.what=what.value; save(); runAlertSearch(q); } };
+  var where=document.createElement('input'); where.className='as-where'; where.placeholder='Location'; where.value=q.where||'';
+  where.onchange=function(){ q.where=where.value; save(); };
+  var go=document.createElement('button'); go.className='as-go'; go.textContent='Search';
+  go.onclick=function(){ q.what=what.value; q.where=where.value; save(); runAlertSearch(q); };
+  var del=document.createElement('button'); del.className='as-del'; del.innerHTML='&#10005;'; del.title='Remove search';
+  del.onclick=function(){ if(confirm('Remove this search?')){ S.alertSearches=S.alertSearches.filter(function(x){return x.id!==q.id;}); save(); render(); } };
+  row.appendChild(what); row.appendChild(where); row.appendChild(go); row.appendChild(del);
+  card.appendChild(row);
+
+  var results=document.createElement('div'); results.className='as-results'; results.id='res-'+q.id;
+  card.appendChild(results);
+
+  // auto-run if it has a query and hasn't been drawn yet this session
+  if(q.what && !alertCache[q.id]) setTimeout(function(){ runAlertSearch(q); },0);
+  else if(alertCache[q.id]) drawAlertResults(q, alertCache[q.id]);
+
+  return card;
+}
+
+var alertCache = {};   // qid -> {jobs|error} for the session
+function runAlertSearch(q){
+  var box=document.getElementById('res-'+q.id); if(!box) return;
+  if(!q.what){ box.innerHTML='<div class="as-hint">Add a role or keywords, then Search.</div>'; return; }
+  box.innerHTML='<div class="as-hint">Searching Adzuna\u2026</div>';
+  var u='/api/jobs?what='+encodeURIComponent(q.what)+'&where='+encodeURIComponent(q.where||'')+'&country=au';
+  fetch(u).then(function(r){ return r.json(); }).then(function(d){
+    alertCache[q.id]=d; drawAlertResults(q,d);
+  }).catch(function(){
+    alertCache[q.id]={error:'Could not reach the jobs service. Is it deployed?'}; drawAlertResults(q,alertCache[q.id]);
+  });
+}
+
+function drawAlertResults(q, d){
+  var box=document.getElementById('res-'+q.id); if(!box) return;
+  box.innerHTML='';
+  if(d.needsSetup){
+    box.innerHTML='<div class="as-setup"><b>Adzuna key needed.</b> Add ADZUNA_APP_ID and ADZUNA_APP_KEY in Vercel &rsaquo; Settings &rsaquo; Environment Variables, then redeploy. Free key at developer.adzuna.com.</div>';
+    return;
+  }
+  if(d.error){ box.innerHTML='<div class="as-hint">'+d.error+'</div>'; return; }
+  var jobs=d.jobs||[];
+  if(!jobs.length){ box.innerHTML='<div class="as-hint">No matches right now. Try broader keywords or a wider location.</div>'; return; }
+
+  var changed=false;
+  jobs.forEach(function(j){
+    var isNew = !S.alertsSeen[j.id];
+    var a=document.createElement('a'); a.className='job'+(isNew?' job-new':''); a.href=j.url; a.target='_blank'; a.rel='noopener';
+    var t=document.createElement('div'); t.className='job-t';
+    t.innerHTML = (isNew?'<span class="job-badge">NEW</span> ':'') + escapeHtml(j.title);
+    var m=document.createElement('div'); m.className='job-m';
+    m.textContent = j.company + (j.location?(' \u00b7 '+j.location):'') + (j.salary?(' \u00b7 '+j.salary):'') + (j.created?(' \u00b7 '+relDate(j.created)):'');
+    a.appendChild(t); a.appendChild(m);
+    box.appendChild(a);
+    if(isNew){ S.alertsSeen[j.id]=true; changed=true; }
+  });
+  if(changed) saveLocal();
+}
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function relDate(iso){
+  try{ var d=new Date(iso), now=new Date(); var days=Math.floor((now-d)/86400000);
+    if(days<=0) return 'today'; if(days===1) return 'yesterday'; if(days<7) return days+'d ago'; return d.toLocaleDateString();
+  }catch(e){ return ''; }
+}
+
 
 
 
