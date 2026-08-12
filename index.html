@@ -385,6 +385,33 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .job-save:hover{background:rgba(201,154,30,.25)}
 .job-save.on{color:#c99a1e}
 .hit-item{border-left-color:#c99a1e}
+/* store audit */
+.aud-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 2px 18px}
+.aud-url{flex:2;min-width:220px;font-family:var(--sans);font-size:15px;padding:11px 13px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
+.aud-seg{font-family:var(--sans);font-size:14px;padding:11px 10px;background:var(--surface);border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a;cursor:pointer}
+.aud-go{font-family:var(--sans);font-weight:700;font-size:15px;color:#fff;background:#a83232;border:3px solid;border-color:#d88 #5e1111 #5e1111 #d88;padding:11px 22px;cursor:pointer}
+.aud-go:disabled{opacity:.6;cursor:default}
+.aud-top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--surface);border:3px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;padding:16px;margin-bottom:16px}
+.aud-score{width:84px;height:84px;border:5px solid;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;background:#fff}
+.aud-score b{font-family:var(--sans);font-size:30px;line-height:1}
+.aud-score span{font-family:var(--sans);font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--fg-mut)}
+.aud-meta{flex:1;min-width:160px}
+.aud-host{font-family:var(--sans);font-size:18px;font-weight:700;color:#12143a}
+.aud-meta div:last-child{font-family:var(--sans);font-size:12px;color:var(--fg-mut);text-transform:capitalize}
+.aud-dl{font-family:var(--sans);font-weight:700;font-size:14px;color:#fff;background:var(--navy);border:2px solid;border-color:#4a4f80 #0a0c28 #0a0c28 #4a4f80;padding:10px 16px;cursor:pointer}
+.aud-sec{background:var(--surface);border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;padding:14px 16px;margin-bottom:14px}
+.aud-sec h3{font-family:var(--sans);font-size:15px;color:var(--navy);margin:0 0 10px;font-weight:700}
+.aud-cwv{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.aud-cwv-cell{background:var(--surface-2);border:1px solid var(--line);padding:10px;text-align:center}
+.aud-cwv-k{display:block;font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--fg-mut)}
+.aud-cwv-v{display:block;font-family:var(--sans);font-size:22px;font-weight:700;margin:3px 0}
+.aud-cwv-c{display:block;font-family:var(--sans);font-size:11px;color:var(--fg-mut)}
+.aud-lab-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-family:var(--sans);font-size:14px;color:#12143a}
+.aud-lab-row b{font-weight:700}
+.aud-opp{border-bottom:1px solid var(--line);padding:10px 0}
+.aud-opp-h{display:flex;justify-content:space-between;gap:10px;font-family:var(--sans);font-size:14px;font-weight:700;color:#12143a}
+.aud-opp-h b{color:#a83232;white-space:nowrap}
+.aud-opp p{font-family:var(--sans);font-size:12.5px;color:var(--fg-mut);margin:4px 0 0;line-height:1.4}
 .as-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .as-what{flex:2;min-width:200px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
 .as-where{flex:1;min-width:120px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
@@ -2357,6 +2384,190 @@ function toggleHit(j){
   saveLocal(); pushRemote(true);
 }
 
+/* ═══ Store Audit — Performance (PageSpeed / Lighthouse) ═══ */
+var auditState = { url:'', strategy:'mobile', running:false, data:null, error:null };
+
+function renderAudit(){
+  sheet.innerHTML='';
+  var head=document.createElement('div'); head.className='proj-head';
+  var h=document.createElement('h2'); h.textContent='Store Audit \u2014 Performance';
+  head.appendChild(h);
+  sheet.appendChild(head);
+
+  var hint=document.createElement('p'); hint.className='as-autohint';
+  hint.textContent='Paste a client store URL for a real Core Web Vitals + performance audit (Google Lighthouse). Generates an on-screen report and downloads a Markdown file.';
+  sheet.appendChild(hint);
+
+  // input row
+  var bar=document.createElement('div'); bar.className='aud-bar';
+  var inp=document.createElement('input'); inp.className='aud-url'; inp.type='text'; inp.placeholder='https://clientstore.com'; inp.value=auditState.url;
+  inp.onkeydown=function(e){ if(e.key==='Enter') runAudit(inp.value, seg.value); };
+  var seg=document.createElement('select'); seg.className='aud-seg';
+  [['mobile','Mobile'],['desktop','Desktop']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(auditState.strategy===o[0])op.selected=true; seg.appendChild(op); });
+  var go=document.createElement('button'); go.className='aud-go'; go.textContent=auditState.running?'Auditing\u2026':'Run audit';
+  go.disabled=auditState.running;
+  go.onclick=function(){ runAudit(inp.value, seg.value); };
+  bar.appendChild(inp); bar.appendChild(seg); bar.appendChild(go);
+  sheet.appendChild(bar);
+
+  var out=document.createElement('div'); out.id='aud-out'; sheet.appendChild(out);
+
+  if(auditState.running){ out.innerHTML='<div class="as-hint">Running Lighthouse audit\u2026 this can take 10\u201330 seconds.</div>'; return; }
+  if(auditState.error){ out.innerHTML='<div class="as-setup">'+escapeHtml(auditState.error)+'</div>'; return; }
+  if(auditState.data){ drawAudit(auditState.data, out); }
+}
+
+function runAudit(url, strategy){
+  url=(url||'').trim(); if(!url){ return; }
+  auditState.url=url; auditState.strategy=strategy||'mobile'; auditState.running=true; auditState.error=null; auditState.data=null;
+  render();
+  fetch('/api/audit?url='+encodeURIComponent(url)+'&strategy='+encodeURIComponent(auditState.strategy))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      auditState.running=false;
+      if(d.error){ auditState.error=(d.needsSetup?'PageSpeed quota/rate hit. Add a PAGESPEED_API_KEY in Vercel > Settings > Environment Variables (enable the PageSpeed Insights API in Google Cloud) for reliable audits. ':'')+d.error; render(); return; }
+      auditState.data=d; render();
+      // auto-download the markdown report
+      downloadAuditMd(d);
+    })
+    .catch(function(){ auditState.running=false; auditState.error='Could not reach the audit service. Is it deployed?'; render(); });
+}
+
+function scoreColor(s){ if(s===null) return '#6a6d82'; if(s>=90) return '#2f8f4e'; if(s>=50) return '#c99a1e'; return '#a83232'; }
+function fmtMs(ms){ if(ms===null||ms===undefined) return '\u2014'; if(ms>=1000) return (ms/1000).toFixed(1)+'s'; return Math.round(ms)+'ms'; }
+function catLabel(c){ return c==='FAST'?'Good':c==='AVERAGE'?'Needs work':c==='SLOW'?'Poor':(c||''); }
+
+function drawAudit(d, out){
+  out.innerHTML='';
+  var host=''; try{ host=new URL(d.finalUrl||d.url).hostname; }catch(e){ host=d.url; }
+
+  // score + download
+  var top=document.createElement('div'); top.className='aud-top';
+  var sc=document.createElement('div'); sc.className='aud-score'; sc.style.borderColor=scoreColor(d.score);
+  sc.innerHTML='<b style="color:'+scoreColor(d.score)+'">'+(d.score===null?'\u2014':d.score)+'</b><span>Performance</span>';
+  var meta=document.createElement('div'); meta.className='aud-meta';
+  meta.innerHTML='<div class="aud-host">'+escapeHtml(host)+'</div><div>'+d.strategy+' \u00b7 '+new Date(d.fetchedAt).toLocaleString()+'</div>';
+  var dl=document.createElement('button'); dl.className='aud-dl'; dl.textContent='\u2193 Download .md';
+  dl.onclick=function(){ downloadAuditMd(d); };
+  top.appendChild(sc); top.appendChild(meta); top.appendChild(dl);
+  out.appendChild(top);
+
+  // field data (real users)
+  if(d.field){
+    var fsec=document.createElement('div'); fsec.className='aud-sec';
+    fsec.innerHTML='<h3>Core Web Vitals \u2014 real users'+(d.field.overall?(' ('+catLabel(d.field.overall)+')'):'')+'</h3>';
+    var grid=document.createElement('div'); grid.className='aud-cwv';
+    [['LCP',d.field.lcp,'ms'],['INP',d.field.inp,'ms'],['CLS',d.field.cls,'cls'],['FCP',d.field.fcp,'ms']].forEach(function(x){
+      var m=x[1]; if(!m) return;
+      var v = x[2]==='cls' ? (m.p/100).toFixed(2) : fmtMs(m.p);
+      var cell=document.createElement('div'); cell.className='aud-cwv-cell';
+      cell.innerHTML='<span class="aud-cwv-k">'+x[0]+'</span><span class="aud-cwv-v" style="color:'+(m.cat==='FAST'?'#2f8f4e':m.cat==='AVERAGE'?'#c99a1e':'#a83232')+'">'+v+'</span><span class="aud-cwv-c">'+catLabel(m.cat)+'</span>';
+      grid.appendChild(cell);
+    });
+    fsec.appendChild(grid); out.appendChild(fsec);
+  }
+
+  // lab metrics
+  var lsec=document.createElement('div'); lsec.className='aud-sec';
+  lsec.innerHTML='<h3>Lab metrics (Lighthouse)</h3>';
+  var lg=document.createElement('div'); lg.className='aud-lab';
+  [['First Contentful Paint',d.lab.fcp],['Largest Contentful Paint',d.lab.lcp],['Total Blocking Time',d.lab.tbt],['Cumulative Layout Shift',d.lab.cls],['Speed Index',d.lab.si],['Time to Interactive',d.lab.tti]].forEach(function(x){
+    var row=document.createElement('div'); row.className='aud-lab-row';
+    row.innerHTML='<span>'+x[0]+'</span><b>'+(x[1].value||'\u2014')+'</b>';
+    lg.appendChild(row);
+  });
+  lsec.appendChild(lg); out.appendChild(lsec);
+
+  // opportunities
+  if(d.opportunities && d.opportunities.length){
+    var osec=document.createElement('div'); osec.className='aud-sec';
+    osec.innerHTML='<h3>Top opportunities</h3>';
+    d.opportunities.forEach(function(o){
+      var it=document.createElement('div'); it.className='aud-opp';
+      it.innerHTML='<div class="aud-opp-h"><span>'+escapeHtml(o.title)+'</span><b>~'+fmtMs(o.savingsMs)+'</b></div><p>'+escapeHtml(o.description)+'</p>';
+      osec.appendChild(it);
+    });
+    out.appendChild(osec);
+  }
+
+  // diagnostics
+  if(d.diagnostics && d.diagnostics.length){
+    var dsec=document.createElement('div'); dsec.className='aud-sec';
+    dsec.innerHTML='<h3>Diagnostics</h3>';
+    d.diagnostics.forEach(function(g){
+      var it=document.createElement('div'); it.className='aud-opp';
+      it.innerHTML='<div class="aud-opp-h"><span>'+escapeHtml(g.title)+'</span><b>'+escapeHtml(g.value||'')+'</b></div><p>'+escapeHtml(g.description)+'</p>';
+      dsec.appendChild(it);
+    });
+    out.appendChild(dsec);
+  }
+}
+
+function auditMarkdown(d){
+  var host=''; try{ host=new URL(d.finalUrl||d.url).hostname; }catch(e){ host=d.url; }
+  var L=[];
+  L.push('# Store Performance Audit \u2014 '+host);
+  L.push('');
+  L.push('- **URL:** '+(d.finalUrl||d.url));
+  L.push('- **Device:** '+(d.strategy==='desktop'?'Desktop':'Mobile'));
+  L.push('- **Audited:** '+new Date(d.fetchedAt).toLocaleString());
+  L.push('- **Source:** Google PageSpeed Insights (Lighthouse)');
+  L.push('');
+  L.push('## Overall performance score: '+(d.score===null?'N/A':d.score+' / 100'));
+  L.push('');
+  if(d.field){
+    L.push('## Core Web Vitals \u2014 real-user field data'+(d.field.overall?(' ('+catLabel(d.field.overall)+')'):''));
+    if(d.field.lcp) L.push('- **LCP** (Largest Contentful Paint): '+fmtMs(d.field.lcp.p)+' \u2014 '+catLabel(d.field.lcp.cat));
+    if(d.field.inp) L.push('- **INP** (Interaction to Next Paint): '+fmtMs(d.field.inp.p)+' \u2014 '+catLabel(d.field.inp.cat));
+    if(d.field.cls) L.push('- **CLS** (Cumulative Layout Shift): '+(d.field.cls.p/100).toFixed(2)+' \u2014 '+catLabel(d.field.cls.cat));
+    if(d.field.fcp) L.push('- **FCP** (First Contentful Paint): '+fmtMs(d.field.fcp.p)+' \u2014 '+catLabel(d.field.fcp.cat));
+    L.push('');
+  } else {
+    L.push('_Not enough real-user (field) data for this URL. Lab metrics below._');
+    L.push('');
+  }
+  L.push('## Lab metrics (Lighthouse)');
+  L.push('| Metric | Value |');
+  L.push('| --- | --- |');
+  L.push('| First Contentful Paint | '+(d.lab.fcp.value||'\u2014')+' |');
+  L.push('| Largest Contentful Paint | '+(d.lab.lcp.value||'\u2014')+' |');
+  L.push('| Total Blocking Time | '+(d.lab.tbt.value||'\u2014')+' |');
+  L.push('| Cumulative Layout Shift | '+(d.lab.cls.value||'\u2014')+' |');
+  L.push('| Speed Index | '+(d.lab.si.value||'\u2014')+' |');
+  L.push('| Time to Interactive | '+(d.lab.tti.value||'\u2014')+' |');
+  L.push('');
+  if(d.opportunities && d.opportunities.length){
+    L.push('## Top opportunities (ranked by estimated saving)');
+    d.opportunities.forEach(function(o,i){
+      L.push((i+1)+'. **'+o.title+'** \u2014 est. save ~'+fmtMs(o.savingsMs));
+      if(o.description) L.push('   '+o.description);
+    });
+    L.push('');
+  }
+  if(d.diagnostics && d.diagnostics.length){
+    L.push('## Diagnostics');
+    d.diagnostics.forEach(function(g){
+      L.push('- **'+g.title+'**'+(g.value?(' ('+g.value+')'):''));
+      if(g.description) L.push('  '+g.description);
+    });
+    L.push('');
+  }
+  L.push('---');
+  L.push('_Generated by Dockit Store Audit \u00b7 data from Google PageSpeed Insights._');
+  return L.join('\n');
+}
+
+function downloadAuditMd(d){
+  var host=''; try{ host=new URL(d.finalUrl||d.url).hostname.replace(/^www\./,''); }catch(e){ host='site'; }
+  var md=auditMarkdown(d);
+  var blob=new Blob([md],{type:'text/markdown'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='audit-'+host+'-'+new Date().toISOString().slice(0,10)+'.md';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+}
+
 /* ═══ Hit List — saved leads to contact (shared) ══════════ */
 function renderHitList(){
   sheet.innerHTML='';
@@ -2446,7 +2657,7 @@ function render(){
 
   // per-business tabs
   var TABS = {
-    gmc:[['tasks','Tasks'],['projects','Projects'],['notifs','Alerts'],['hitlist','Hit List'+((S.hitList&&S.hitList.length)?' ('+S.hitList.length+')':'')]],
+    gmc:[['tasks','Tasks'],['projects','Projects'],['notifs','Alerts'],['hitlist','Hit List'+((S.hitList&&S.hitList.length)?' ('+S.hitList.length+')':'')],['audit','Audit']],
     pit:[['tasks','Tasks'],['grid','Grid']]
   };
   var tabs = TABS[hub] || null;
@@ -2480,6 +2691,7 @@ function render(){
   if(S.page==='notifs'){ document.getElementById('headcount').textContent=''; renderNotifs(); return; }
   if(S.page==='grid'){ document.getElementById('headcount').textContent=''; renderGridPage(); return; }
   if(S.page==='hitlist'){ document.getElementById('headcount').textContent=''; renderHitList(); return; }
+  if(S.page==='audit'){ document.getElementById('headcount').textContent=''; renderAudit(); return; }
 
   var dockEl=document.getElementById('dock'); if(dockEl) dockEl.style.display='none';  // business is the scope
   var c=counts();
