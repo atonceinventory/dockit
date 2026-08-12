@@ -356,6 +356,21 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .gmenu-item.danger{color:#a83232;font-weight:700;border-bottom:none}
 /* job alerts */
 .as-autohint{font-family:var(--sans);font-style:italic;font-size:13px;color:#3a3d63;margin:0 2px 14px}
+/* collapsible search header */
+.as-card{padding:0!important;overflow:hidden}
+.as-head{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;font-family:var(--sans)}
+.as-head:hover{background:#d5d7e6}
+.as-chev{color:#1e2352;font-size:12px;width:14px}
+.as-title{font-size:16px;font-weight:700;color:#12143a;text-transform:capitalize}
+.as-count{font-size:14px;color:#3a3d63}
+.as-newn{background:#a83232;color:#fff;font-size:10px;font-weight:700;letter-spacing:.05em;padding:1px 6px;margin-left:4px}
+.as-body{padding:0 14px 14px}
+.job{display:flex;align-items:stretch;margin-bottom:8px;background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--gmc)}
+.job-link{flex:1;display:block;padding:11px 12px;text-decoration:none;color:var(--fg)}
+.job:hover{background:#d5d7e6}
+.job-new{border-left-color:#a83232}
+.job-dismiss{flex:none;width:40px;color:var(--fg-dim);font-size:14px;border-left:1px solid var(--line);cursor:pointer}
+.job-dismiss:hover{background:#a83232;color:#fff}
 .as-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .as-what{flex:2;min-width:200px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
 .as-where{flex:1;min-width:120px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
@@ -366,9 +381,6 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .as-results{margin-top:12px}
 .as-hint,.as-setup{font-family:var(--sans);font-size:13px;font-style:italic;color:#3a3d63;padding:8px 2px}
 .as-setup{font-style:normal;background:rgba(201,154,30,.18);border:1px solid rgba(30,35,82,.2);padding:11px 12px}
-.job{display:block;padding:11px 12px;margin-bottom:8px;background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--gmc);text-decoration:none;color:var(--fg)}
-.job:hover{background:#d5d7e6}
-.job-new{border-left-color:#a83232}
 .job-t{font-family:var(--sans);font-size:15.5px;font-weight:600;color:#12143a}
 .job-m{font-family:var(--sans);font-size:12.5px;color:#3a3d63;margin-top:3px}
 .job-badge{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.06em;background:#a83232;color:#fff;padding:1px 6px;vertical-align:middle}
@@ -1136,7 +1148,8 @@ function sharedPayload(){
   return {
     tasks: S.tasks.filter(function(t){ return SHARED_LANES.indexOf(t.lane)!==-1; }),
     projects: S.projects || [],
-    alertSearches: S.alertSearches || []
+    alertSearches: S.alertSearches || [],
+    alertsDismissed: S.alertsDismissed || {}
   };
 }
 function privatePayload(){
@@ -1157,6 +1170,9 @@ function applyRemoteScope(data, laneKeys){
   }
   if(laneKeys.indexOf('gmc')!==-1 && Array.isArray(data.alertSearches)){
     S.alertSearches = data.alertSearches;
+  }
+  if(laneKeys.indexOf('gmc')!==-1 && data.alertsDismissed && typeof data.alertsDismissed==='object'){
+    S.alertsDismissed = data.alertsDismissed;
   }
   saveLocal();
   render();
@@ -1266,7 +1282,8 @@ if(!S.kind) S.kind='task';               // what the capture bar adds
 if(!S.page) S.page='tasks';              // tasks | projects | notifs
 if(!S.projects) S.projects=[];           // GMC project tracker (shared)
 if(!S.alertSearches) S.alertSearches=[];  // GMC job-alert searches (shared)
-if(!S.alertsSeen) S.alertsSeen={};        // job id -> true (for NEW badges, local)
+if(!S.alertsSeen) S.alertsSeen={};        // job id -> true (NEW badges, local)
+if(!S.alertsDismissed) S.alertsDismissed={};// job id -> true (dismissed, SHARED)
 var hub = null;                          // chosen business (null = picker)
 try{ hub = sessionStorage.getItem('dockit_hub') || null; }catch(e){}
 LANES.forEach(function(l){ if(!S.logos[l.k] && DEFAULT_LOGOS[l.k]) S.logos[l.k]=DEFAULT_LOGOS[l.k]; });
@@ -2083,66 +2100,92 @@ function addAlertSearch(){
   setTimeout(function(){ var el=document.querySelector('[data-qid="'+q.id+'"] .as-what'); if(el) el.focus(); },30);
 }
 
-function alertSearchCard(q){
-  var card=document.createElement('div'); card.className='pcard'; card.style.cursor='default'; card.setAttribute('data-qid',q.id);
+var alertOpen = {};    // qid -> true when expanded (runtime)
+var alertCache = {};   // qid -> {jobs|error} for the session
 
+function alertSearchCard(q){
+  var card=document.createElement('div'); card.className='pcard as-card'; card.style.cursor='default'; card.setAttribute('data-qid',q.id);
+
+  var head=document.createElement('div'); head.className='as-head';
+  var chev=document.createElement('span'); chev.className='as-chev'; chev.innerHTML=alertOpen[q.id]?'&#9662;':'&#9656;';
+  var title=document.createElement('span'); title.className='as-title'; title.textContent=q.what||'Untitled search';
+  var count=document.createElement('span'); count.className='as-count'; count.id='cnt-'+q.id; count.textContent='\u2026';
+  var spacer=document.createElement('span'); spacer.style.flex='1';
+  var del=document.createElement('button'); del.className='as-del'; del.innerHTML='&#10005;'; del.title='Remove search';
+  del.onclick=function(e){ e.stopPropagation(); if(confirm('Remove this search?')){ S.alertSearches=S.alertSearches.filter(function(x){return x.id!==q.id;}); saveLocal(); pushRemote(true); render(); } };
+  head.appendChild(chev); head.appendChild(title); head.appendChild(count); head.appendChild(spacer); head.appendChild(del);
+  head.onclick=function(){
+    alertOpen[q.id]=!alertOpen[q.id];
+    chev.innerHTML=alertOpen[q.id]?'&#9662;':'&#9656;';
+    body.style.display=alertOpen[q.id]?'':'none';
+    if(alertOpen[q.id] && alertCache[q.id]) drawAlertResults(q,alertCache[q.id]);
+  };
+  card.appendChild(head);
+
+  var body=document.createElement('div'); body.className='as-body'; body.style.display=alertOpen[q.id]?'':'none';
   var row=document.createElement('div'); row.className='as-row';
-  var what=document.createElement('input'); what.className='as-what'; what.placeholder='Role or keywords (e.g. Shopify developer)'; what.value=q.what||'';
-  what.onchange=function(){ q.what=what.value; saveLocal(); pushRemote(true); };
-  what.onkeydown=function(e){ if(e.key==='Enter'){ q.what=what.value; save(); runAlertSearch(q); } };
+  var what=document.createElement('input'); what.className='as-what'; what.placeholder='Role or keywords'; what.value=q.what||'';
+  what.onchange=function(){ q.what=what.value; title.textContent=q.what||'Untitled search'; saveLocal(); pushRemote(true); };
+  what.onkeydown=function(e){ if(e.key==='Enter'){ q.what=what.value; saveLocal(); pushRemote(true); runAlertSearch(q); } };
   var where=document.createElement('input'); where.className='as-where'; where.placeholder='Location'; where.value=q.where||'';
   where.onchange=function(){ q.where=where.value; saveLocal(); pushRemote(true); };
-  var go=document.createElement('button'); go.className='as-go'; go.textContent='Search';
-  go.onclick=function(){ q.what=what.value; q.where=where.value; save(); runAlertSearch(q); };
-  var del=document.createElement('button'); del.className='as-del'; del.innerHTML='&#10005;'; del.title='Remove search';
-  del.onclick=function(){ if(confirm('Remove this search?')){ S.alertSearches=S.alertSearches.filter(function(x){return x.id!==q.id;}); saveLocal(); pushRemote(true); render(); } };
-  row.appendChild(what); row.appendChild(where); row.appendChild(go); row.appendChild(del);
-  card.appendChild(row);
-
+  var go=document.createElement('button'); go.className='as-go'; go.textContent='Refresh';
+  go.onclick=function(){ q.what=what.value; q.where=where.value; saveLocal(); pushRemote(true); runAlertSearch(q); };
+  row.appendChild(what); row.appendChild(where); row.appendChild(go);
+  body.appendChild(row);
   var results=document.createElement('div'); results.className='as-results'; results.id='res-'+q.id;
-  card.appendChild(results);
+  body.appendChild(results);
+  card.appendChild(body);
 
-  // auto-run if it has a query and hasn't been drawn yet this session
-  if(q.what && !alertCache[q.id]) setTimeout(function(){ runAlertSearch(q); },0);
-  else if(alertCache[q.id]) drawAlertResults(q, alertCache[q.id]);
+  // fetch on load (even when collapsed) so the count shows
+  if(q.what){
+    if(alertCache[q.id]) drawAlertResults(q, alertCache[q.id]);
+    else setTimeout(function(){ runAlertSearch(q); },0);
+  } else { count.textContent='(0)'; }
 
   return card;
 }
 
-var alertCache = {};   // qid -> {jobs|error} for the session
 function runAlertSearch(q){
-  var box=document.getElementById('res-'+q.id); if(!box) return;
-  if(!q.what){ box.innerHTML='<div class="as-hint">Add a role or keywords, then Search.</div>'; return; }
-  box.innerHTML='<div class="as-hint">Searching Adzuna\u2026</div>';
+  var cnt=document.getElementById('cnt-'+q.id); if(cnt) cnt.textContent='\u2026';
+  if(!q.what){ if(cnt) cnt.textContent='(0)'; return; }
   var u='/api/jobs?what='+encodeURIComponent(q.what)+'&where='+encodeURIComponent(q.where||'')+'&country=au';
   fetch(u).then(function(r){ return r.json(); }).then(function(d){
     alertCache[q.id]=d; drawAlertResults(q,d);
   }).catch(function(){
-    alertCache[q.id]={error:'Could not reach the jobs service. Is it deployed?'}; drawAlertResults(q,alertCache[q.id]);
+    alertCache[q.id]={error:'Could not reach the jobs service.'}; drawAlertResults(q,alertCache[q.id]);
   });
 }
 
 function drawAlertResults(q, d){
-  var box=document.getElementById('res-'+q.id); if(!box) return;
-  box.innerHTML='';
-  if(d.needsSetup){
-    box.innerHTML='<div class="as-setup"><b>Adzuna key needed.</b> Add ADZUNA_APP_ID and ADZUNA_APP_KEY in Vercel &rsaquo; Settings &rsaquo; Environment Variables, then redeploy. Free key at developer.adzuna.com.</div>';
-    return;
-  }
-  if(d.error){ box.innerHTML='<div class="as-hint">'+d.error+'</div>'; return; }
-  var jobs=d.jobs||[];
-  if(!jobs.length){ box.innerHTML='<div class="as-hint">No matches right now. Try broader keywords or a wider location.</div>'; return; }
+  var cnt=document.getElementById('cnt-'+q.id);
+  var box=document.getElementById('res-'+q.id);
 
+  if(d.needsSetup){ if(cnt)cnt.textContent=''; if(box) box.innerHTML='<div class="as-setup"><b>Adzuna key needed.</b> Add ADZUNA_APP_ID and ADZUNA_APP_KEY in Vercel &rsaquo; Settings &rsaquo; Environment Variables, then redeploy.</div>'; return; }
+  if(d.error){ if(cnt)cnt.textContent=''; if(box) box.innerHTML='<div class="as-hint">'+d.error+'</div>'; return; }
+
+  var jobs=(d.jobs||[]).filter(function(j){ return !S.alertsDismissed[j.id]; });
+  jobs.sort(function(a,b){ return (new Date(b.created||0)) - (new Date(a.created||0)); });  // newest first
+  var newCount=jobs.filter(function(j){ return !S.alertsSeen[j.id]; }).length;
+  if(cnt) cnt.innerHTML='('+jobs.length+')'+(newCount?' <span class="as-newn">'+newCount+' new</span>':'');
+
+  if(!box || !alertOpen[q.id]) return;   // only build the list when expanded
+
+  box.innerHTML='';
+  if(!jobs.length){ box.innerHTML='<div class="as-hint">No matches right now, or all dismissed.</div>'; return; }
   var changed=false;
   jobs.forEach(function(j){
-    var isNew = !S.alertsSeen[j.id];
-    var a=document.createElement('a'); a.className='job'+(isNew?' job-new':''); a.href=j.url; a.target='_blank'; a.rel='noopener';
-    var t=document.createElement('div'); t.className='job-t';
-    t.innerHTML = (isNew?'<span class="job-badge">NEW</span> ':'') + escapeHtml(j.title);
+    var isNew=!S.alertsSeen[j.id];
+    var wrap=document.createElement('div'); wrap.className='job'+(isNew?' job-new':'');
+    var a=document.createElement('a'); a.className='job-link'; a.href=j.url; a.target='_blank'; a.rel='noopener';
+    var t=document.createElement('div'); t.className='job-t'; t.innerHTML=(isNew?'<span class="job-badge">NEW</span> ':'')+escapeHtml(j.title);
     var m=document.createElement('div'); m.className='job-m';
-    m.textContent = j.company + (j.location?(' \u00b7 '+j.location):'') + (j.salary?(' \u00b7 '+j.salary):'') + (j.created?(' \u00b7 '+relDate(j.created)):'');
+    m.textContent=j.company+(j.location?(' \u00b7 '+j.location):'')+(j.salary?(' \u00b7 '+j.salary):'')+(j.created?(' \u00b7 '+relDate(j.created)):'');
     a.appendChild(t); a.appendChild(m);
-    box.appendChild(a);
+    var dis=document.createElement('button'); dis.className='job-dismiss'; dis.innerHTML='&#10005;'; dis.title='Dismiss (clears for everyone)';
+    dis.onclick=function(e){ e.preventDefault(); e.stopPropagation(); S.alertsDismissed[j.id]=true; saveLocal(); pushRemote(true); drawAlertResults(q,d); };
+    wrap.appendChild(a); wrap.appendChild(dis);
+    box.appendChild(wrap);
     if(isNew){ S.alertsSeen[j.id]=true; changed=true; }
   });
   if(changed) saveLocal();
