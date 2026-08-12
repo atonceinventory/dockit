@@ -364,6 +364,8 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .as-locbtn{font-family:var(--sans);font-size:14px;color:var(--navy);background:var(--surface);border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;padding:8px 16px;cursor:pointer}
 .as-locbtn.on{background:var(--navy);color:#fff;border-color:#4a4f80 #0a0c28 #0a0c28 #4a4f80}
 .as-locbtn:disabled{opacity:.5;cursor:default}
+.as-refreshall{font-family:var(--sans);font-size:14px;font-weight:700;color:#fff;background:var(--navy);border:2px solid;border-color:#4a4f80 #0a0c28 #0a0c28 #4a4f80;padding:8px 16px;cursor:pointer}
+.as-refreshall:active{transform:translate(1px,1px)}
 /* collapsible search header */
 .as-card{padding:0!important;overflow:hidden}
 .as-head{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;font-family:var(--sans)}
@@ -2221,6 +2223,10 @@ function renderNotifs(){
   });
   var intl=document.createElement('button'); intl.className='as-locbtn'; intl.disabled=true; intl.textContent='International (soon)';
   locbar.appendChild(intl);
+  var spacer=document.createElement('span'); spacer.style.flex='1'; locbar.appendChild(spacer);
+  var refreshAll=document.createElement('button'); refreshAll.className='as-refreshall'; refreshAll.textContent='\u21bb Refresh all';
+  refreshAll.onclick=function(){ alertCache={}; S.alertSearches.forEach(function(q){ if(q.what) runAlertSearch(q); }); };
+  locbar.appendChild(refreshAll);
   sheet.appendChild(locbar);
 
   if(!S.alertSearches.length){
@@ -2262,11 +2268,9 @@ function alertSearchCard(q){
   var body=document.createElement('div'); body.className='as-body'; body.style.display=alertOpen[q.id]?'':'none';
   var row=document.createElement('div'); row.className='as-row';
   var what=document.createElement('input'); what.className='as-what'; what.placeholder='Role or keywords'; what.value=q.what||'';
-  what.onchange=function(){ q.what=what.value; title.textContent=q.what||'Untitled search'; saveLocal(); pushRemote(true); };
+  what.onchange=function(){ q.what=what.value; title.textContent=q.what||'Untitled search'; saveLocal(); pushRemote(true); runAlertSearch(q); };
   what.onkeydown=function(e){ if(e.key==='Enter'){ q.what=what.value; saveLocal(); pushRemote(true); runAlertSearch(q); } };
-  var go=document.createElement('button'); go.className='as-go'; go.textContent='Refresh';
-  go.onclick=function(){ q.what=what.value; saveLocal(); pushRemote(true); runAlertSearch(q); };
-  row.appendChild(what); row.appendChild(go);
+  row.appendChild(what);
   body.appendChild(row);
   var results=document.createElement('div'); results.className='as-results'; results.id='res-'+q.id;
   body.appendChild(results);
