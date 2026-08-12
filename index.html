@@ -358,7 +358,12 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .gmenu-item:active{background:#1e2352;color:#fff}
 .gmenu-item.danger{color:#a83232;font-weight:700;border-bottom:none}
 /* job alerts */
-.as-autohint{font-family:var(--sans);font-style:italic;font-size:13px;color:#3a3d63;margin:0 2px 14px}
+.as-autohint{font-family:var(--sans);font-style:italic;font-size:13px;color:#3a3d63;margin:0 2px 12px}
+.as-locbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 2px 18px}
+.as-loclabel{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-mut);margin-right:2px}
+.as-locbtn{font-family:var(--sans);font-size:14px;color:var(--navy);background:var(--surface);border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;padding:8px 16px;cursor:pointer}
+.as-locbtn.on{background:var(--navy);color:#fff;border-color:#4a4f80 #0a0c28 #0a0c28 #4a4f80}
+.as-locbtn:disabled{opacity:.5;cursor:default}
 /* collapsible search header */
 .as-card{padding:0!important;overflow:hidden}
 .as-head{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;font-family:var(--sans)}
@@ -1403,6 +1408,7 @@ if(!S.kind) S.kind='task';               // what the capture bar adds
 if(!S.page) S.page='tasks';              // tasks | projects | notifs
 if(!S.projects) S.projects=[];           // GMC project tracker (shared)
 if(!S.alertSearches) S.alertSearches=[];  // GMC job-alert searches (shared)
+if(!S.alertLoc) S.alertLoc='Perth';       // global location filter (local view pref)
 if(!S.alertsSeen) S.alertsSeen={};        // job id -> true (NEW badges, local)
 if(!S.alertsDismissed) S.alertsDismissed={};// job id -> true (dismissed, SHARED)
 var hub = null;                          // chosen business (null = picker)
@@ -2170,15 +2176,15 @@ function renderNotifs(){
   sheet.innerHTML='';
 
   // Seeded search set. Bump ALERT_SEED_VERSION to push a new default set to everyone.
-  var ALERT_SEED_VERSION = 2;   // v2: tight, Shopify/ecommerce lead-gen, Perth-first
+  var ALERT_SEED_VERSION = 3;   // v3: keyword-only (location is a global filter)
   if(S.alertSeedVersion !== ALERT_SEED_VERSION){
     var _n=Date.now();
     S.alertSearches=[
-      {id:uid(),what:'shopify developer',where:'Perth',created:_n},
-      {id:uid(),what:'ecommerce manager',where:'Perth',created:_n},
-      {id:uid(),what:'ecommerce coordinator',where:'Perth',created:_n},
-      {id:uid(),what:'shopify',where:'Perth',created:_n},
-      {id:uid(),what:'shopify developer',where:'Australia',created:_n}
+      {id:uid(),what:'shopify developer',created:_n},
+      {id:uid(),what:'ecommerce manager',created:_n},
+      {id:uid(),what:'ecommerce coordinator',created:_n},
+      {id:uid(),what:'shopify',created:_n},
+      {id:uid(),what:'ecommerce',created:_n}
     ];
     S.alertSeedVersion=ALERT_SEED_VERSION; S.alertSeeded=true;
     saveLocal(); pushRemote(true);
@@ -2193,11 +2199,23 @@ function renderNotifs(){
   sheet.appendChild(head);
 
   var hint=document.createElement('p'); hint.className='as-autohint';
-  hint.textContent='Searches run automatically each time you open this page. New roles are badged NEW.';
+  hint.textContent='Searches run automatically when you open this page. Perth roles are prioritised first. New ones are badged NEW.';
   sheet.appendChild(hint);
 
+  // global location filter (applies to every search)
+  var locbar=document.createElement('div'); locbar.className='as-locbar';
+  var lab=document.createElement('span'); lab.className='as-loclabel'; lab.textContent='Location'; locbar.appendChild(lab);
+  [['Perth','Perth'],['Australia','Australia']].forEach(function(o){
+    var b=document.createElement('button'); b.className='as-locbtn'+(S.alertLoc===o[0]?' on':''); b.textContent=o[1];
+    b.onclick=function(){ if(S.alertLoc===o[0]) return; S.alertLoc=o[0]; saveLocal(); alertCache={}; render(); };
+    locbar.appendChild(b);
+  });
+  var intl=document.createElement('button'); intl.className='as-locbtn'; intl.disabled=true; intl.textContent='International (soon)';
+  locbar.appendChild(intl);
+  sheet.appendChild(locbar);
+
   if(!S.alertSearches.length){
-    sheet.appendChild(emptyState('No searches yet','Add a job search \u2014 a role and a location \u2014 and Dockit pulls matching listings from Adzuna into here. Shared with your GMC team.'));
+    sheet.appendChild(emptyState('No searches yet','Add a keyword search and Dockit pulls matching listings from Adzuna into here, prioritised by location. Shared with your GMC team.'));
     return;
   }
 
@@ -2205,7 +2223,7 @@ function renderNotifs(){
 }
 
 function addAlertSearch(){
-  var q={ id:uid(), what:'', where:'Perth', created:Date.now() };
+  var q={ id:uid(), what:'', created:Date.now() };
   S.alertSearches.unshift(q); saveLocal(); pushRemote(true); render();
   setTimeout(function(){ var el=document.querySelector('[data-qid="'+q.id+'"] .as-what'); if(el) el.focus(); },30);
 }
@@ -2237,11 +2255,9 @@ function alertSearchCard(q){
   var what=document.createElement('input'); what.className='as-what'; what.placeholder='Role or keywords'; what.value=q.what||'';
   what.onchange=function(){ q.what=what.value; title.textContent=q.what||'Untitled search'; saveLocal(); pushRemote(true); };
   what.onkeydown=function(e){ if(e.key==='Enter'){ q.what=what.value; saveLocal(); pushRemote(true); runAlertSearch(q); } };
-  var where=document.createElement('input'); where.className='as-where'; where.placeholder='Location'; where.value=q.where||'';
-  where.onchange=function(){ q.where=where.value; saveLocal(); pushRemote(true); };
   var go=document.createElement('button'); go.className='as-go'; go.textContent='Refresh';
-  go.onclick=function(){ q.what=what.value; q.where=where.value; saveLocal(); pushRemote(true); runAlertSearch(q); };
-  row.appendChild(what); row.appendChild(where); row.appendChild(go);
+  go.onclick=function(){ q.what=what.value; saveLocal(); pushRemote(true); runAlertSearch(q); };
+  row.appendChild(what); row.appendChild(go);
   body.appendChild(row);
   var results=document.createElement('div'); results.className='as-results'; results.id='res-'+q.id;
   body.appendChild(results);
@@ -2259,12 +2275,21 @@ function alertSearchCard(q){
 function runAlertSearch(q){
   var cnt=document.getElementById('cnt-'+q.id); if(cnt) cnt.textContent='\u2026';
   if(!q.what){ if(cnt) cnt.textContent='(0)'; return; }
-  var u='/api/jobs?what='+encodeURIComponent(q.what)+'&where='+encodeURIComponent(q.where||'')+'&country=au';
+  var where = (S.alertLoc==='Perth') ? 'Perth' : 'Australia';
+  var u='/api/jobs?what='+encodeURIComponent(q.what)+'&where='+encodeURIComponent(where)+'&country=au';
   fetch(u).then(function(r){ return r.json(); }).then(function(d){
     alertCache[q.id]=d; drawAlertResults(q,d);
   }).catch(function(){
     alertCache[q.id]={error:'Could not reach the jobs service.'}; drawAlertResults(q,alertCache[q.id]);
   });
+}
+
+/* desirability: Perth > WA > rest of AU — surfaces the best leads first */
+function locScore(j){
+  var L=(j.location||'').toLowerCase();
+  if(L.indexOf('perth')!==-1) return 3;
+  if(/\bwa\b|western australia/.test(L)) return 2;
+  return 1;
 }
 
 function drawAlertResults(q, d){
@@ -2275,7 +2300,12 @@ function drawAlertResults(q, d){
   if(d.error){ if(cnt)cnt.textContent=''; if(box) box.innerHTML='<div class="as-hint">'+d.error+'</div>'; return; }
 
   var jobs=(d.jobs||[]).filter(function(j){ return !S.alertsDismissed[j.id]; });
-  jobs.sort(function(a,b){ return (new Date(b.created||0)) - (new Date(a.created||0)); });  // newest first
+  // Perth-first, then WA, then rest of AU; newest first within each tier
+  jobs.sort(function(a,b){
+    var la=locScore(a), lb=locScore(b);
+    if(la!==lb) return lb-la;
+    return (new Date(b.created||0)) - (new Date(a.created||0));
+  });
   var newCount=jobs.filter(function(j){ return !S.alertsSeen[j.id]; }).length;
   if(cnt) cnt.innerHTML='('+jobs.length+')'+(newCount?' <span class="as-newn">'+newCount+' new</span>':'');
 
