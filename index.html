@@ -838,6 +838,47 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
   .pick-name{ font-size:19px; }
   .pick-sub{ font-size:13px; }
 }
+/* ── project tracker (grouped tables) ────── */
+.pj-block{margin-bottom:26px}
+.pj-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--navy);padding:9px 12px;border:2px solid;border-color:#4a4f80 #0a0c28 #0a0c28 #4a4f80}
+.pj-name{flex:1;min-width:160px;background:none;border:none;color:#fff;font-family:var(--sans);font-size:17px;font-weight:700}
+.pj-name::placeholder{color:rgba(255,255,255,.5)}
+.pj-prog{font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.8)}
+.pj-deadline{font-family:var(--sans);font-size:12px;color:#fff;border:1px solid rgba(255,255,255,.4);padding:5px 10px}
+.pj-deadline:active{background:rgba(255,255,255,.15)}
+.pj-risk{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;background:#a83232;color:#fff;padding:3px 8px}
+.pj-del{color:rgba(255,255,255,.7);font-size:14px;padding:2px 6px}
+.pj-del:hover{color:#fff}
+.pj-table{border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;border-top:none;background:var(--surface)}
+.pj-row{display:grid;grid-template-columns:1.6fr 128px 108px 104px 92px 1.4fr 34px;align-items:stretch;border-bottom:1px solid var(--line)}
+.pj-th{background:var(--surface-3);font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-mut)}
+.pj-th span{padding:8px 10px;display:flex;align-items:center}
+.pj-c{font-family:var(--sans);font-size:14px;color:#12143a;border-left:1px solid var(--line);padding:0;display:flex;align-items:center}
+.pj-row .pj-c:first-child{border-left:none}
+.pj-task,.pj-notes{background:#fff;border:none;padding:10px;width:100%;font-family:var(--sans);font-size:14px;color:#12143a}
+.pj-task:focus,.pj-notes:focus{outline:2px solid var(--aoi);outline-offset:-2px}
+.pj-c select{width:100%;height:100%;border:none;background:none;font-family:var(--sans);font-size:13px;padding:8px;text-transform:capitalize;cursor:pointer}
+.pj-c.status[data-s="complete"]{background:rgba(123,224,160,.22)}
+.pj-c.status[data-s="inprogress"]{background:rgba(63,174,255,.18)}
+.pj-c.status[data-s="review"]{background:rgba(90,100,242,.18)}
+.pj-c.status[data-s="hold"]{background:rgba(201,154,30,.2)}
+.pj-c.prio[data-p="high"] select{color:#a83232;font-weight:700}
+.pj-c.prio[data-p="medium"] select{color:#c99a1e}
+.pj-c.prio[data-p="low"] select{color:#2f8f4e}
+.pj-date{background:none;border:none;border-left:1px solid var(--line);font-family:var(--sans);font-size:13px;color:#12143a;cursor:pointer;padding:8px;justify-content:center}
+.pj-date:hover{background:#d5d7e6}
+.pj-kill{color:var(--fg-dim);cursor:pointer;justify-content:center;font-size:13px}
+.pj-kill:hover{background:#a83232;color:#fff}
+.pj-add{display:block;width:100%;background:var(--surface-2);border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;border-top:none;color:var(--navy);font-family:var(--sans);font-size:14px;font-weight:600;padding:11px;cursor:pointer}
+.pj-add:hover{background:#d5d7e6}
+@media (max-width:820px){
+  .pj-row{grid-template-columns:1fr 1fr;gap:0}
+  .pj-th{display:none}
+  .pj-c{border-left:none;border-top:1px solid var(--line)}
+  .pj-task{grid-column:1 / -1;font-weight:600}
+  .pj-notes{grid-column:1 / -1}
+  .pj-kill{grid-column:2;justify-content:flex-end;padding-right:10px}
+}
 </style>
 </head>
 <body>
@@ -1949,108 +1990,96 @@ function projectAtRisk(p){
 
 function renderProjects(){
   sheet.innerHTML='';
-  if(openProject){ renderProjectDetail(); return; }
 
   var head=document.createElement('div'); head.className='proj-head';
   var h=document.createElement('h2'); h.textContent='GMC Projects';
-  var sub=document.createElement('span'); sub.className='sub'; sub.textContent=(S.projects.length)+' active';
+  var sub=document.createElement('span'); sub.className='sub'; sub.textContent=(S.projects.length)+' project'+(S.projects.length===1?'':'s');
   var nb=document.createElement('button'); nb.className='newp'; nb.textContent='+ New project';
   nb.onclick=function(){
-    var p={ id:uid(), name:'New project', deadline:null, tasks:[], created:Date.now() };
-    S.projects.unshift(p); save(); openProject=p.id; render();
+    var p={ id:uid(), name:'New project', deadline:null, tasks:[{ id:uid(), title:'', status:'notstarted', prio:'medium', due:null, assignee:'griff', notes:'' }], created:Date.now() };
+    S.projects.unshift(p); save(); render();
+    setTimeout(function(){ var el=document.querySelector('[data-pid="'+p.id+'"] .pj-name'); if(el){ el.focus(); el.select(); } },30);
   };
   head.appendChild(h); head.appendChild(sub); head.appendChild(nb);
   sheet.appendChild(head);
 
   if(!S.projects.length){
-    sheet.appendChild(emptyState('No projects yet','Create a project to group its tasks, track status and progress, and see what is at risk. Shared with your GMC team.'));
+    sheet.appendChild(emptyState('No projects yet','Add a project to get a ready-made table \u2014 just fill in the rows. Status, priority, due date, who is on it, and notes. Shared with your GMC team.'));
     return;
   }
-  S.projects.forEach(function(p){
-    var card=document.createElement('div'); card.className='pcard';
-    var top=document.createElement('div'); top.className='pcard-top';
-    var nm=document.createElement('div'); nm.className='pcard-name'; nm.textContent=p.name||'Untitled';
-    top.appendChild(nm);
-    if(projectAtRisk(p)){ var r=document.createElement('span'); r.className='risk'; r.textContent='At risk'; top.appendChild(r); }
-    card.appendChild(top);
-    var meta=document.createElement('div'); meta.className='pcard-meta';
-    var pct=projectPct(p);
-    var bar=document.createElement('div'); bar.className='pbar'; var fill=document.createElement('span'); fill.style.width=pct+'%'; bar.appendChild(fill);
-    var pctl=document.createElement('span'); pctl.textContent=pct+'%';
-    var tn=document.createElement('span'); tn.textContent=(p.tasks?p.tasks.length:0)+' tasks';
-    var dl=document.createElement('span'); dl.textContent = p.deadline ? fmtDue(p.deadline).label : 'no deadline';
-    meta.appendChild(bar); meta.appendChild(pctl); meta.appendChild(tn); meta.appendChild(dl);
-    card.appendChild(meta);
-    card.onclick=function(){ openProject=p.id; render(); };
-    sheet.appendChild(card);
-  });
+  S.projects.forEach(function(p){ sheet.appendChild(projectBlock(p)); });
 }
 
-function renderProjectDetail(){
-  var p = S.projects.find(function(x){ return x.id===openProject; });
-  if(!p){ openProject=null; return renderProjects(); }
-
-  var h=document.createElement('div'); h.className='pdetail-h';
-  var back=document.createElement('button'); back.className='back'; back.innerHTML='&#8249;';
-  back.onclick=function(){ openProject=null; render(); };
-  var nm=document.createElement('input'); nm.className='pname'; nm.value=p.name||''; nm.placeholder='Project name';
-  nm.onchange=function(){ p.name=nm.value; save(); };
-  var db=document.createElement('button'); db.className='pf'; db.style.alignSelf='center';
-  db.textContent = p.deadline ? fmtDue(p.deadline).label : '+ Deadline';
-  db.onclick=function(){ openCal(p.deadline, function(iso){ p.deadline=iso; save(); render(); }); };
-  var del=document.createElement('button'); del.className='delp'; del.textContent='Delete';
-  del.onclick=function(){ if(confirm('Delete this project and its tasks?')){ S.projects=S.projects.filter(function(x){return x.id!==p.id;}); openProject=null; save(); render(); } };
-  h.appendChild(back); h.appendChild(nm); h.appendChild(db); h.appendChild(del);
-  sheet.appendChild(h);
-
-  // desktop column header
-  var hd=document.createElement('div'); hd.className='ptask-head';
-  ['Task','Status','Priority','Deadline','Owner',''].forEach(function(t){ var s=document.createElement('span'); s.textContent=t; hd.appendChild(s); });
-  sheet.appendChild(hd);
-
+function projectBlock(p){
   if(!p.tasks) p.tasks=[];
-  p.tasks.forEach(function(t){ sheet.appendChild(projectTaskRow(p,t)); });
+  var block=document.createElement('div'); block.className='pj-block'; block.setAttribute('data-pid',p.id);
 
-  var add=document.createElement('button'); add.className='ptask-add'; add.textContent='+ Add task';
-  add.onclick=function(){ p.tasks.push({ id:uid(), title:'', status:'notstarted', prio:'medium', due:null, assignee:'griff', pct:0 }); save(); render(); };
-  sheet.appendChild(add);
+  // project subheading
+  var hd=document.createElement('div'); hd.className='pj-head';
+  var nm=document.createElement('input'); nm.className='pj-name'; nm.value=p.name||''; nm.placeholder='Project name';
+  nm.onchange=function(){ p.name=nm.value; saveLocal(); pushRemote(true); };
+  var done=p.tasks.filter(function(t){return t.status==='complete';}).length;
+  var prog=document.createElement('span'); prog.className='pj-prog'; prog.textContent=done+'/'+p.tasks.length+' done';
+  var db=document.createElement('button'); db.className='pj-deadline';
+  db.textContent = p.deadline ? ('Due '+fmtDue(p.deadline).label) : '+ Deadline';
+  db.onclick=function(){ openCal(p.deadline, function(iso){ p.deadline=iso; save(); render(); }); };
+  if(projectAtRisk(p)){ var r=document.createElement('span'); r.className='pj-risk'; r.textContent='At risk'; hd.appendChild(r); }
+  var del=document.createElement('button'); del.className='pj-del'; del.innerHTML='&#10005;'; del.title='Delete project';
+  del.onclick=function(){ if(confirm('Delete "'+(p.name||'this project')+'" and its tasks?')){ S.projects=S.projects.filter(function(x){return x.id!==p.id;}); save(); render(); } };
+  hd.insertBefore(nm, hd.firstChild);
+  hd.appendChild(prog); hd.appendChild(db); hd.appendChild(del);
+  block.appendChild(hd);
+
+  // table
+  var table=document.createElement('div'); table.className='pj-table';
+  var th=document.createElement('div'); th.className='pj-row pj-th';
+  ['Task','Status','Priority','Due','Person','Notes',''].forEach(function(c){ var s=document.createElement('span'); s.textContent=c; th.appendChild(s); });
+  table.appendChild(th);
+
+  p.tasks.forEach(function(t){ table.appendChild(projectTaskRow(p,t)); });
+  block.appendChild(table);
+
+  var add=document.createElement('button'); add.className='pj-add'; add.textContent='+ Add task';
+  add.onclick=function(){ p.tasks.push({ id:uid(), title:'', status:'notstarted', prio:'medium', due:null, assignee:'griff', notes:'' }); save(); render(); };
+  block.appendChild(add);
+  return block;
 }
 
 function projectTaskRow(p,t){
-  var row=document.createElement('div'); row.className='ptask';
+  var row=document.createElement('div'); row.className='pj-row';
 
-  var title=document.createElement('input'); title.className='ptask-title'; title.value=t.title||''; title.placeholder='Task name';
-  title.onchange=function(){ t.title=title.value; save(); };
+  var title=document.createElement('input'); title.className='pj-c pj-task'; title.value=t.title||''; title.placeholder='Task';
+  title.onchange=function(){ t.title=title.value; saveLocal(); pushRemote(true); };
   row.appendChild(title);
 
-  var fields=document.createElement('div'); fields.className='ptask-fields';
-
-  var st=document.createElement('span'); st.className='pf status'; st.dataset.s=t.status||'notstarted';
+  var st=document.createElement('span'); st.className='pj-c pf status'; st.dataset.s=t.status||'notstarted';
   var ss=document.createElement('select');
   PSTATUS.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(t.status===o[0])op.selected=true; ss.appendChild(op); });
   ss.onchange=function(){ t.status=ss.value; save(); render(); };
-  st.appendChild(ss); fields.appendChild(st);
+  st.appendChild(ss); row.appendChild(st);
 
-  var pr=document.createElement('span'); pr.className='pf prio'; pr.dataset.p=t.prio||'medium';
+  var pr=document.createElement('span'); pr.className='pj-c pf prio'; pr.dataset.p=t.prio||'medium';
   var ps=document.createElement('select');
   PPRIO.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(t.prio===o[0])op.selected=true; ps.appendChild(op); });
   ps.onchange=function(){ t.prio=ps.value; save(); render(); };
-  pr.appendChild(ps); fields.appendChild(pr);
+  pr.appendChild(ps); row.appendChild(pr);
 
-  var dd=document.createElement('button'); dd.className='pf';
+  var dd=document.createElement('button'); dd.className='pj-c pj-date';
   dd.textContent = t.due ? fmtDue(t.due).label : '+ Date';
   dd.onclick=function(){ openCal(t.due, function(iso){ t.due=iso; save(); render(); }); };
-  fields.appendChild(dd);
+  row.appendChild(dd);
 
-  var asg=document.createElement('span'); asg.className='pf';
+  var asg=document.createElement('span'); asg.className='pj-c';
   var as=document.createElement('select');
   [['griff','Griff'],['holly','Holly'],['hello','GMC']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(t.assignee===o[0])op.selected=true; as.appendChild(op); });
-  as.onchange=function(){ t.assignee=as.value; save(); };
-  asg.appendChild(as); fields.appendChild(asg);
+  as.onchange=function(){ t.assignee=as.value; saveLocal(); pushRemote(true); };
+  asg.appendChild(as); row.appendChild(asg);
 
-  row.appendChild(fields);
+  var notes=document.createElement('input'); notes.className='pj-c pj-notes'; notes.value=t.notes||''; notes.placeholder='\u2013';
+  notes.onchange=function(){ t.notes=notes.value; saveLocal(); pushRemote(true); };
+  row.appendChild(notes);
 
-  var kill=document.createElement('button'); kill.className='killp'; kill.innerHTML='&#10005;';
+  var kill=document.createElement('button'); kill.className='pj-c pj-kill'; kill.innerHTML='&#10005;'; kill.title='Remove task';
   kill.onclick=function(){ p.tasks=p.tasks.filter(function(x){return x.id!==t.id;}); save(); render(); };
   row.appendChild(kill);
   return row;
