@@ -1,31 +1,16 @@
 {
-  "name": "Docket",
-  "short_name": "Docket",
-  "description": "Day to day tasks and notes across At Once, Good Morning Charlie and Logistics Pit.",
+  "name": "Dockit",
+  "short_name": "Dockit",
+  "description": "Team hub for tasks, projects and job alerts across At Once, Good Morning Charlie and Logistics Pit.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#141416",
-  "theme_color": "#141416",
+  "background_color": "#b7bbd4",
+  "theme_color": "#b7bbd4",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
