@@ -379,6 +379,10 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .job-new{border-left-color:#a83232}
 .job-dismiss{flex:none;width:40px;color:var(--fg-dim);font-size:14px;border-left:1px solid var(--line);cursor:pointer}
 .job-dismiss:hover{background:#a83232;color:#fff}
+.job-save{flex:none;width:42px;color:var(--fg-dim);font-size:17px;border-left:1px solid var(--line);cursor:pointer;line-height:1}
+.job-save:hover{background:rgba(201,154,30,.25)}
+.job-save.on{color:#c99a1e}
+.hit-item{border-left-color:#c99a1e}
 .as-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .as-what{flex:2;min-width:200px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
 .as-where{flex:1;min-width:120px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
@@ -1272,7 +1276,8 @@ function sharedPayload(){
     projects: S.projects || [],
     alertSearches: S.alertSearches || [],
     alertsDismissed: S.alertsDismissed || {},
-    alertSeedVersion: S.alertSeedVersion || 0
+    alertSeedVersion: S.alertSeedVersion || 0,
+    hitList: S.hitList || []
   };
 }
 function privatePayload(){
@@ -1296,6 +1301,9 @@ function applyRemoteScope(data, laneKeys){
   }
   if(laneKeys.indexOf('gmc')!==-1 && data.alertsDismissed && typeof data.alertsDismissed==='object'){
     S.alertsDismissed = data.alertsDismissed;
+  }
+  if(laneKeys.indexOf('gmc')!==-1 && Array.isArray(data.hitList)){
+    S.hitList = data.hitList;
   }
   if(laneKeys.indexOf('gmc')!==-1 && typeof data.alertSeedVersion==='number'){
     S.alertSeedVersion = data.alertSeedVersion;
@@ -1409,6 +1417,7 @@ if(!S.page) S.page='tasks';              // tasks | projects | notifs
 if(!S.projects) S.projects=[];           // GMC project tracker (shared)
 if(!S.alertSearches) S.alertSearches=[];  // GMC job-alert searches (shared)
 if(!S.alertLoc) S.alertLoc='Perth';       // global location filter (local view pref)
+if(!S.hitList) S.hitList=[];              // saved job leads to contact (shared)
 if(!S.alertsSeen) S.alertsSeen={};        // job id -> true (NEW badges, local)
 if(!S.alertsDismissed) S.alertsDismissed={};// job id -> true (dismissed, SHARED)
 var hub = null;                          // chosen business (null = picker)
@@ -2322,13 +2331,58 @@ function drawAlertResults(q, d){
     var m=document.createElement('div'); m.className='job-m';
     m.textContent=j.company+(j.location?(' \u00b7 '+j.location):'')+(j.salary?(' \u00b7 '+j.salary):'')+(j.created?(' \u00b7 '+relDate(j.created)):'');
     a.appendChild(t); a.appendChild(m);
+    var star=document.createElement('button'); star.className='job-save'+(onHitList(j.id)?' on':''); star.innerHTML=onHitList(j.id)?'\u2605':'\u2606'; star.title=onHitList(j.id)?'On Hit List':'Add to Hit List';
+    star.onclick=function(e){ e.preventDefault(); e.stopPropagation(); toggleHit(j);
+      star.className='job-save'+(onHitList(j.id)?' on':''); star.innerHTML=onHitList(j.id)?'\u2605':'\u2606';
+      // refresh the Hit List tab count
+      var tab=document.querySelector('#pages button[data-page="hitlist"]'); if(tab) tab.textContent='Hit List'+(S.hitList.length?' ('+S.hitList.length+')':'');
+    };
     var dis=document.createElement('button'); dis.className='job-dismiss'; dis.innerHTML='&#10005;'; dis.title='Dismiss (clears for everyone)';
     dis.onclick=function(e){ e.preventDefault(); e.stopPropagation(); S.alertsDismissed[j.id]=true; saveLocal(); pushRemote(true); drawAlertResults(q,d); };
-    wrap.appendChild(a); wrap.appendChild(dis);
+    wrap.appendChild(a); wrap.appendChild(star); wrap.appendChild(dis);
     box.appendChild(wrap);
     if(isNew){ S.alertsSeen[j.id]=true; changed=true; }
   });
   if(changed) saveLocal();
+}
+
+function onHitList(id){ return S.hitList.some(function(x){ return x.id===id; }); }
+function toggleHit(j){
+  if(onHitList(j.id)){ S.hitList=S.hitList.filter(function(x){ return x.id!==j.id; }); }
+  else { S.hitList.unshift({ id:j.id, title:j.title, company:j.company, location:j.location, url:j.url, salary:j.salary, created:j.created, savedAt:Date.now() }); }
+  saveLocal(); pushRemote(true);
+}
+
+/* ═══ Hit List — saved leads to contact (shared) ══════════ */
+function renderHitList(){
+  sheet.innerHTML='';
+  var head=document.createElement('div'); head.className='proj-head';
+  var h=document.createElement('h2'); h.textContent='Hit List';
+  var sub=document.createElement('span'); sub.className='sub'; sub.textContent=(S.hitList.length)+' to contact';
+  head.appendChild(h); head.appendChild(sub);
+  sheet.appendChild(head);
+
+  var hint=document.createElement('p'); hint.className='as-autohint';
+  hint.textContent='Leads you have starred in Alerts to reach out to. Shared with your GMC team.';
+  sheet.appendChild(hint);
+
+  if(!S.hitList.length){
+    sheet.appendChild(emptyState('No leads saved yet','In Alerts, tap the star on any job to add it here as a lead to contact.'));
+    return;
+  }
+
+  S.hitList.forEach(function(it){
+    var wrap=document.createElement('div'); wrap.className='job hit-item';
+    var a=document.createElement('a'); a.className='job-link'; a.href=it.url||'#'; a.target='_blank'; a.rel='noopener';
+    var t=document.createElement('div'); t.className='job-t'; t.textContent=it.title||'Untitled role';
+    var m=document.createElement('div'); m.className='job-m';
+    m.textContent=(it.company||'')+(it.location?(' \u00b7 '+it.location):'')+(it.salary?(' \u00b7 '+it.salary):'');
+    a.appendChild(t); a.appendChild(m);
+    var rm=document.createElement('button'); rm.className='job-dismiss'; rm.innerHTML='&#10005;'; rm.title='Remove from Hit List';
+    rm.onclick=function(e){ e.preventDefault(); S.hitList=S.hitList.filter(function(x){ return x.id!==it.id; }); saveLocal(); pushRemote(true); render(); };
+    wrap.appendChild(a); wrap.appendChild(rm);
+    sheet.appendChild(wrap);
+  });
 }
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -2388,7 +2442,7 @@ function render(){
 
   // per-business tabs
   var TABS = {
-    gmc:[['tasks','Tasks'],['projects','Projects'],['notifs','Alerts']],
+    gmc:[['tasks','Tasks'],['projects','Projects'],['notifs','Alerts'],['hitlist','Hit List'+((S.hitList&&S.hitList.length)?' ('+S.hitList.length+')':'')]],
     pit:[['tasks','Tasks'],['grid','Grid']]
   };
   var tabs = TABS[hub] || null;
@@ -2421,6 +2475,7 @@ function render(){
   if(S.page==='projects'){ document.getElementById('headcount').textContent=''; renderProjects(); return; }
   if(S.page==='notifs'){ document.getElementById('headcount').textContent=''; renderNotifs(); return; }
   if(S.page==='grid'){ document.getElementById('headcount').textContent=''; renderGridPage(); return; }
+  if(S.page==='hitlist'){ document.getElementById('headcount').textContent=''; renderHitList(); return; }
 
   var dockEl=document.getElementById('dock'); if(dockEl) dockEl.style.display='none';  // business is the scope
   var c=counts();
