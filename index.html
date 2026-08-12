@@ -355,6 +355,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .gmenu-item:active{background:#1e2352;color:#fff}
 .gmenu-item.danger{color:#a83232;font-weight:700;border-bottom:none}
 /* job alerts */
+.as-autohint{font-family:var(--sans);font-style:italic;font-size:13px;color:#3a3d63;margin:0 2px 14px}
 .as-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .as-what{flex:2;min-width:200px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
 .as-where{flex:1;min-width:120px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
@@ -727,7 +728,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
   .chev{font-size:18px}
 
   main{padding-bottom:52px}
-  .empty{max-width:860px;margin-left:0;margin-right:auto}
+  .empty{max-width:720px;margin-left:auto;margin-right:auto}
   /* footer panels stay readable, not stretched edge to edge */
   .utils,.logos,.sync-panel,.sync-panel .field{max-width:1000px}
 }
@@ -2047,6 +2048,10 @@ function renderNotifs(){
   head.appendChild(h); head.appendChild(sub); head.appendChild(nb);
   sheet.appendChild(head);
 
+  var hint=document.createElement('p'); hint.className='as-autohint';
+  hint.textContent='Searches run automatically each time you open this page. New roles are badged NEW.';
+  sheet.appendChild(hint);
+
   if(!S.alertSearches.length){
     sheet.appendChild(emptyState('No searches yet','Add a job search \u2014 a role and a location \u2014 and Dockit pulls matching listings from Adzuna into here. Shared with your GMC team.'));
     return;
@@ -2057,7 +2062,7 @@ function renderNotifs(){
 
 function addAlertSearch(){
   var q={ id:uid(), what:'', where:'Perth', created:Date.now() };
-  S.alertSearches.unshift(q); save(); render();
+  S.alertSearches.unshift(q); saveLocal(); pushRemote(true); render();
   setTimeout(function(){ var el=document.querySelector('[data-qid="'+q.id+'"] .as-what'); if(el) el.focus(); },30);
 }
 
@@ -2066,14 +2071,14 @@ function alertSearchCard(q){
 
   var row=document.createElement('div'); row.className='as-row';
   var what=document.createElement('input'); what.className='as-what'; what.placeholder='Role or keywords (e.g. Shopify developer)'; what.value=q.what||'';
-  what.onchange=function(){ q.what=what.value; save(); };
+  what.onchange=function(){ q.what=what.value; saveLocal(); pushRemote(true); };
   what.onkeydown=function(e){ if(e.key==='Enter'){ q.what=what.value; save(); runAlertSearch(q); } };
   var where=document.createElement('input'); where.className='as-where'; where.placeholder='Location'; where.value=q.where||'';
-  where.onchange=function(){ q.where=where.value; save(); };
+  where.onchange=function(){ q.where=where.value; saveLocal(); pushRemote(true); };
   var go=document.createElement('button'); go.className='as-go'; go.textContent='Search';
   go.onclick=function(){ q.what=what.value; q.where=where.value; save(); runAlertSearch(q); };
   var del=document.createElement('button'); del.className='as-del'; del.innerHTML='&#10005;'; del.title='Remove search';
-  del.onclick=function(){ if(confirm('Remove this search?')){ S.alertSearches=S.alertSearches.filter(function(x){return x.id!==q.id;}); save(); render(); } };
+  del.onclick=function(){ if(confirm('Remove this search?')){ S.alertSearches=S.alertSearches.filter(function(x){return x.id!==q.id;}); saveLocal(); pushRemote(true); render(); } };
   row.appendChild(what); row.appendChild(where); row.appendChild(go); row.appendChild(del);
   card.appendChild(row);
 
