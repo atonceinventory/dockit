@@ -1266,7 +1266,8 @@ function sharedPayload(){
     tasks: S.tasks.filter(function(t){ return SHARED_LANES.indexOf(t.lane)!==-1; }),
     projects: S.projects || [],
     alertSearches: S.alertSearches || [],
-    alertsDismissed: S.alertsDismissed || {}
+    alertsDismissed: S.alertsDismissed || {},
+    alertSeedVersion: S.alertSeedVersion || 0
   };
 }
 function privatePayload(){
@@ -1290,6 +1291,9 @@ function applyRemoteScope(data, laneKeys){
   }
   if(laneKeys.indexOf('gmc')!==-1 && data.alertsDismissed && typeof data.alertsDismissed==='object'){
     S.alertsDismissed = data.alertsDismissed;
+  }
+  if(laneKeys.indexOf('gmc')!==-1 && typeof data.alertSeedVersion==='number'){
+    S.alertSeedVersion = data.alertSeedVersion;
   }
   saveLocal();
   render();
@@ -2165,18 +2169,19 @@ function projectTaskRow(p,t){
 function renderNotifs(){
   sheet.innerHTML='';
 
-  // first visit: seed a wide ecommerce net (Australia). Only once — deleting them won't re-seed.
-  if(!S.alertSeeded && (!S.alertSearches || S.alertSearches.length===0)){
+  // Seeded search set. Bump ALERT_SEED_VERSION to push a new default set to everyone.
+  var ALERT_SEED_VERSION = 2;   // v2: tight, Shopify/ecommerce lead-gen, Perth-first
+  if(S.alertSeedVersion !== ALERT_SEED_VERSION){
     var _n=Date.now();
     S.alertSearches=[
-      {id:uid(),what:'ecommerce',where:'Australia',created:_n},
-      {id:uid(),what:'shopify',where:'Australia',created:_n},
-      {id:uid(),what:'ecommerce manager',where:'Australia',created:_n},
-      {id:uid(),what:'conversion rate optimisation',where:'Australia',created:_n},
-      {id:uid(),what:'SEO specialist',where:'Australia',created:_n},
-      {id:uid(),what:'digital marketing',where:'Australia',created:_n}
+      {id:uid(),what:'shopify developer',where:'Perth',created:_n},
+      {id:uid(),what:'ecommerce manager',where:'Perth',created:_n},
+      {id:uid(),what:'ecommerce coordinator',where:'Perth',created:_n},
+      {id:uid(),what:'shopify',where:'Perth',created:_n},
+      {id:uid(),what:'shopify developer',where:'Australia',created:_n}
     ];
-    S.alertSeeded=true; saveLocal(); pushRemote(true);
+    S.alertSeedVersion=ALERT_SEED_VERSION; S.alertSeeded=true;
+    saveLocal(); pushRemote(true);
   }
 
   var head=document.createElement('div'); head.className='proj-head';
