@@ -2040,6 +2040,20 @@ function projectTaskRow(p,t){
 function renderNotifs(){
   sheet.innerHTML='';
 
+  // first visit: seed a wide ecommerce net (Australia). Only once — deleting them won't re-seed.
+  if(!S.alertSeeded && (!S.alertSearches || S.alertSearches.length===0)){
+    var _n=Date.now();
+    S.alertSearches=[
+      {id:uid(),what:'ecommerce',where:'Australia',created:_n},
+      {id:uid(),what:'shopify',where:'Australia',created:_n},
+      {id:uid(),what:'ecommerce manager',where:'Australia',created:_n},
+      {id:uid(),what:'conversion rate optimisation',where:'Australia',created:_n},
+      {id:uid(),what:'SEO specialist',where:'Australia',created:_n},
+      {id:uid(),what:'digital marketing',where:'Australia',created:_n}
+    ];
+    S.alertSeeded=true; saveLocal(); pushRemote(true);
+  }
+
   var head=document.createElement('div'); head.className='proj-head';
   var h=document.createElement('h2'); h.textContent='Job Alerts';
   var sub=document.createElement('span'); sub.className='sub'; sub.textContent=(S.alertSearches.length)+' search'+(S.alertSearches.length===1?'':'es');
