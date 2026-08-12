@@ -1013,9 +1013,11 @@ function onAuth(user){
     setSync('err'); render(); return;
   }
   if(fbUser){
-    if(fbUser.email !== lastAuthEmail){ hub=null; lastAuthEmail=fbUser.email; }  // fresh login -> picker
+    if(lastAuthEmail && lastAuthEmail!==fbUser.email){ try{ sessionStorage.removeItem('dockit_hub'); }catch(e){} }
+    lastAuthEmail=fbUser.email;
+    try{ hub = sessionStorage.getItem('dockit_hub') || null; }catch(e){}  // refresh keeps place; fresh login has none
   } else {
-    hub=null; lastAuthEmail=null;    // signed out -> landing
+    hub=null; lastAuthEmail=null; try{ sessionStorage.removeItem('dockit_hub'); }catch(e){}  // signed out -> landing
   }
   render();
   if(fbUser){ subscribe(); }
@@ -1265,7 +1267,8 @@ if(!S.page) S.page='tasks';              // tasks | projects | notifs
 if(!S.projects) S.projects=[];           // GMC project tracker (shared)
 if(!S.alertSearches) S.alertSearches=[];  // GMC job-alert searches (shared)
 if(!S.alertsSeen) S.alertsSeen={};        // job id -> true (for NEW badges, local)
-var hub = null;                          // chosen business (null = picker); not persisted
+var hub = null;                          // chosen business (null = picker)
+try{ hub = sessionStorage.getItem('dockit_hub') || null; }catch(e){}
 LANES.forEach(function(l){ if(!S.logos[l.k] && DEFAULT_LOGOS[l.k]) S.logos[l.k]=DEFAULT_LOGOS[l.k]; });
 
 /* ── one-time migration to the unified, dated model ──────────
@@ -1904,7 +1907,7 @@ function renderPicker(){
     var sub=document.createElement('span'); sub.className='pick-sub';
     sub.textContent = openN + ' open' + (l.k==='gmc' ? ' \u00b7 projects \u00b7 alerts' : '');
     card.appendChild(mk); card.appendChild(nm); card.appendChild(sub);
-    card.onclick=function(){ hub=l.k; S.page='tasks'; render(); window.scrollTo(0,0); };
+    card.onclick=function(){ hub=l.k; S.page='tasks'; try{ sessionStorage.setItem('dockit_hub',l.k); }catch(e){} render(); window.scrollTo(0,0); };
     grid.appendChild(card);
   });
   wrap.appendChild(grid);
@@ -2226,7 +2229,7 @@ function render(){
   var bhBtn=document.createElement('button'); bhBtn.className='bizback';
   var L = LANE[hub] || {name:hub};
   bhBtn.innerHTML='&#8249; Businesses';
-  bhBtn.onclick=function(){ hub=null; S.filter=null; render(); window.scrollTo(0,0); };
+  bhBtn.onclick=function(){ hub=null; S.filter=null; try{ sessionStorage.removeItem('dockit_hub'); }catch(e){} render(); window.scrollTo(0,0); };
   var bhName=document.createElement('span'); bhName.className='bizname'; bhName.textContent = L.name || hub.toUpperCase();
   bh.appendChild(bhBtn); bh.appendChild(bhName);
 
