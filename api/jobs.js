@@ -46,6 +46,9 @@ export default async function handler(req, res) {
       'content-type': 'application/json'
     });
     if (where) params.set('where', where);
+    var jobtype = (req.query.jobtype || '').toString().toLowerCase();
+    if (jobtype === 'contract') params.set('contract', '1');
+    else if (jobtype === 'permanent') params.set('permanent', '1');
 
     const url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1?${params.toString()}`;
     const r = await fetch(url);
@@ -67,6 +70,8 @@ export default async function handler(req, res) {
         salary: (j.salary_min || j.salary_max)
           ? ('$' + Math.round(j.salary_min || j.salary_max).toLocaleString() + (j.salary_max && j.salary_max !== j.salary_min ? '–$' + Math.round(j.salary_max).toLocaleString() : ''))
           : '',
+        contractType: j.contract_type || '',
+        contractTime: j.contract_time || '',
         snippet: (j.description || '').slice(0, 180)
       };
     });
