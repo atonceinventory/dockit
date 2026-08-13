@@ -412,6 +412,13 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .aud-opp-h{display:flex;justify-content:space-between;gap:10px;font-family:var(--sans);font-size:14px;font-weight:700;color:#12143a}
 .aud-opp-h b{color:#a83232;white-space:nowrap}
 .aud-opp p{font-family:var(--sans);font-size:12.5px;color:var(--fg-mut);margin:4px 0 0;line-height:1.4}
+.aud-ai{font-family:var(--sans);font-weight:700;font-size:13px;color:#fff;background:#6b4fbb;border:2px solid;border-color:#9b83d9 #3d2670 #3d2670 #9b83d9;padding:8px 14px;cursor:pointer}
+.aud-ai:disabled{opacity:.6;cursor:default}
+.aud-ai-body{font-family:var(--sans);font-size:14px;color:#12143a;line-height:1.5;margin-top:10px}
+.aud-ai-body h4{font-size:14px;color:var(--navy);margin:12px 0 4px}
+.aud-ai-body ul{margin:4px 0 10px;padding-left:20px}
+.aud-ai-body li{margin:3px 0}
+.aud-ai-body p{margin:6px 0}
 .aud-plat{font-family:var(--sans);font-size:14px;color:#12143a}
 .aud-badge{display:inline-block;font-family:var(--sans);font-size:12px;font-weight:700;padding:3px 10px;background:var(--surface-2);border:1px solid var(--line);color:var(--fg-mut)}
 .aud-badge.on{background:#95bf47;color:#fff;border-color:#7a9e38}
@@ -2412,7 +2419,35 @@ function toggleHit(j){
 }
 
 /* ═══ Store Audit — Performance (PageSpeed / Lighthouse) ═══ */
-var auditState = { url:'', strategy:'mobile', running:false, data:null, error:null };
+var auditState = { url:'', strategy:'mobile', running:false, data:null, error:null, insights:null, insightsRunning:false, insightsError:null };
+
+function genInsights(d){
+  auditState.insightsRunning=true; auditState.insightsError=null; render();
+  fetch('/api/insights', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(d) })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      auditState.insightsRunning=false;
+      if(res.error){ auditState.insightsError=(res.needsSetup?'':'')+res.error; render(); return; }
+      auditState.insights=res.insights; render();
+    })
+    .catch(function(){ auditState.insightsRunning=false; auditState.insightsError='Could not reach the AI service. Is it deployed?'; render(); });
+}
+
+// tiny Markdown -> HTML (headings, bold, bullets, paragraphs) for the insights block
+function mdToHtml(md){
+  var lines=(md||'').split('\n'); var html=''; var inList=false;
+  lines.forEach(function(ln){
+    var t=ln.trim();
+    var closeList=function(){ if(inList){ html+='</ul>'; inList=false; } };
+    if(/^#{1,6}\s/.test(t)){ closeList(); var lvl=(t.match(/^#+/)[0].length); html+='<h4>'+escapeHtml(t.replace(/^#+\s/,''))+'</h4>'; }
+    else if(/^[-*]\s/.test(t)){ if(!inList){ html+='<ul>'; inList=true; } html+='<li>'+inline(t.replace(/^[-*]\s/,''))+'</li>'; }
+    else if(t===''){ closeList(); }
+    else { closeList(); html+='<p>'+inline(t)+'</p>'; }
+  });
+  if(inList) html+='</ul>';
+  return html;
+  function inline(s){ return escapeHtml(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>'); }
+}
 
 function renderAudit(){
   sheet.innerHTML='';
@@ -2446,7 +2481,7 @@ function renderAudit(){
 
 function runAudit(url, strategy){
   url=(url||'').trim(); if(!url){ return; }
-  auditState.url=url; auditState.strategy=strategy||'mobile'; auditState.running=true; auditState.error=null; auditState.data=null;
+  auditState.url=url; auditState.strategy=strategy||'mobile'; auditState.running=true; auditState.error=null; auditState.data=null; auditState.insights=null; auditState.insightsError=null;
   render();
   fetch('/api/audit?url='+encodeURIComponent(url)+'&strategy='+encodeURIComponent(auditState.strategy))
     .then(function(r){ return r.json(); })
@@ -2478,6 +2513,25 @@ function drawAudit(d, out){
   dl.onclick=function(){ downloadAuditMd(d); };
   top.appendChild(sc); top.appendChild(meta); top.appendChild(dl);
   out.appendChild(top);
+
+  // AI insights (internal action briefing)
+  var aisec=document.createElement('div'); aisec.className='aud-sec';
+  var aihead=document.createElement('div'); aihead.style.display='flex'; aihead.style.justifyContent='space-between'; aihead.style.alignItems='center'; aihead.style.gap='10px';
+  aihead.innerHTML='<h3 style="margin:0">AI action briefing</h3>';
+  var aibtn=document.createElement('button'); aibtn.className='aud-ai';
+  aibtn.textContent = auditState.insights ? 'Regenerate' : '\u2728 Generate AI insights';
+  aibtn.disabled = auditState.insightsRunning;
+  if(auditState.insightsRunning) aibtn.textContent='Thinking\u2026';
+  aibtn.onclick=function(){ genInsights(d); };
+  aihead.appendChild(aibtn);
+  aisec.appendChild(aihead);
+  var aibody=document.createElement('div'); aibody.className='aud-ai-body'; aibody.id='aud-ai-body';
+  if(auditState.insightsRunning) aibody.innerHTML='<div class="as-hint">Claude is analysing the audit\u2026</div>';
+  else if(auditState.insightsError) aibody.innerHTML='<div class="as-setup">'+escapeHtml(auditState.insightsError)+'</div>';
+  else if(auditState.insights) aibody.innerHTML=mdToHtml(auditState.insights);
+  else aibody.innerHTML='<div class="as-hint" style="padding:6px 0">Turn the raw numbers into a prioritised, Shopify-specific action list for you and Holly. ~2c per run.</div>';
+  aisec.appendChild(aibody);
+  out.appendChild(aisec);
 
   // platform (Shopify detection + theme)
   if(d.platform && d.platform.fetched){
@@ -2612,6 +2666,11 @@ function auditMarkdown(d){
       L.push('- **'+g.title+'**'+(g.value?(' ('+g.value+')'):''));
       if(g.description) L.push('  '+g.description);
     });
+    L.push('');
+  }
+  if(auditState.insights){
+    L.push('## AI action briefing');
+    L.push(auditState.insights);
     L.push('');
   }
   L.push('---');
