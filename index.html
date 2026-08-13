@@ -412,6 +412,13 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .aud-opp-h{display:flex;justify-content:space-between;gap:10px;font-family:var(--sans);font-size:14px;font-weight:700;color:#12143a}
 .aud-opp-h b{color:#a83232;white-space:nowrap}
 .aud-opp p{font-family:var(--sans);font-size:12.5px;color:var(--fg-mut);margin:4px 0 0;line-height:1.4}
+.aud-plat{font-family:var(--sans);font-size:14px;color:#12143a}
+.aud-badge{display:inline-block;font-family:var(--sans);font-size:12px;font-weight:700;padding:3px 10px;background:var(--surface-2);border:1px solid var(--line);color:var(--fg-mut)}
+.aud-badge.on{background:#95bf47;color:#fff;border-color:#7a9e38}
+.aud-apps{display:flex;flex-wrap:wrap;gap:8px}
+.aud-app{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--gmc);padding:7px 11px;font-family:var(--sans)}
+.aud-app b{display:block;font-size:13px;color:#12143a}
+.aud-app span{display:block;font-size:11px;color:var(--fg-mut)}
 .as-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .as-what{flex:2;min-width:200px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
 .as-where{flex:1;min-width:120px;font-family:var(--sans);font-size:15px;padding:9px 11px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
@@ -2452,6 +2459,31 @@ function drawAudit(d, out){
   top.appendChild(sc); top.appendChild(meta); top.appendChild(dl);
   out.appendChild(top);
 
+  // platform (Shopify detection + theme)
+  if(d.platform && d.platform.fetched){
+    var psec=document.createElement('div'); psec.className='aud-sec';
+    var badge = d.platform.isShopify ? '<span class="aud-badge on">Shopify</span>' : '<span class="aud-badge">Not detected as Shopify</span>';
+    var themeStr = (d.platform.theme && d.platform.theme.name) ? (' \u00b7 Theme: <b>'+escapeHtml(d.platform.theme.name)+'</b>') : '';
+    psec.innerHTML='<h3>Platform</h3><div class="aud-plat">'+badge+themeStr+'</div>';
+    out.appendChild(psec);
+
+    // detected apps grouped by category
+    var asec=document.createElement('div'); asec.className='aud-sec';
+    asec.innerHTML='<h3>Detected third-party apps'+(d.platform.apps.length?(' ('+d.platform.apps.length+')'):'')+'</h3>';
+    if(d.platform.apps.length){
+      var wrap=document.createElement('div'); wrap.className='aud-apps';
+      d.platform.apps.forEach(function(a){
+        var chip=document.createElement('div'); chip.className='aud-app';
+        chip.innerHTML='<b>'+escapeHtml(a.name)+'</b><span>'+escapeHtml(a.cat)+'</span>';
+        wrap.appendChild(chip);
+      });
+      asec.appendChild(wrap);
+    } else {
+      asec.innerHTML+='<p class="as-hint" style="padding:0">No known apps detected in the page markup. (Some apps load only on specific pages or after interaction.)</p>';
+    }
+    out.appendChild(asec);
+  }
+
   // field data (real users)
   if(d.field){
     var fsec=document.createElement('div'); fsec.className='aud-sec';
@@ -2515,6 +2547,16 @@ function auditMarkdown(d){
   L.push('');
   L.push('## Overall performance score: '+(d.score===null?'N/A':d.score+' / 100'));
   L.push('');
+  if(d.platform && d.platform.fetched){
+    L.push('## Platform');
+    L.push('- **Shopify:** '+(d.platform.isShopify?'Yes':'Not detected'));
+    if(d.platform.theme && d.platform.theme.name) L.push('- **Theme:** '+d.platform.theme.name);
+    L.push('');
+    L.push('## Detected third-party apps'+(d.platform.apps.length?(' ('+d.platform.apps.length+')'):''));
+    if(d.platform.apps.length){ d.platform.apps.forEach(function(a){ L.push('- **'+a.name+'** \u2014 '+a.cat); }); }
+    else { L.push('_No known apps detected in the page markup._'); }
+    L.push('');
+  }
   if(d.field){
     L.push('## Core Web Vitals \u2014 real-user field data'+(d.field.overall?(' ('+catLabel(d.field.overall)+')'):''));
     if(d.field.lcp) L.push('- **LCP** (Largest Contentful Paint): '+fmtMs(d.field.lcp.p)+' \u2014 '+catLabel(d.field.lcp.cat));
