@@ -2346,7 +2346,7 @@ function drawAlertResults(q, d){
   if(d.needsSetup){ if(cnt)cnt.textContent=''; if(box) box.innerHTML='<div class="as-setup"><b>Adzuna key needed.</b> Add ADZUNA_APP_ID and ADZUNA_APP_KEY in Vercel &rsaquo; Settings &rsaquo; Environment Variables, then redeploy.</div>'; return; }
   if(d.error){ if(cnt)cnt.textContent=''; if(box) box.innerHTML='<div class="as-hint">'+d.error+'</div>'; return; }
 
-  var jobs=(d.jobs||[]).filter(function(j){ return !S.alertsDismissed[j.id]; });
+  var jobs=(d.jobs||[]).filter(function(j){ return !S.alertsDismissed[j.id] && !onHitList(j.id); });
   // Perth-first, then WA, then rest of AU; newest first within each tier
   jobs.sort(function(a,b){
     var la=locScore(a), lb=locScore(b);
@@ -2371,9 +2371,9 @@ function drawAlertResults(q, d){
     a.appendChild(t); a.appendChild(m);
     var star=document.createElement('button'); star.className='job-save'+(onHitList(j.id)?' on':''); star.innerHTML=onHitList(j.id)?'\u2605':'\u2606'; star.title=onHitList(j.id)?'On Hit List':'Add to Hit List';
     star.onclick=function(e){ e.preventDefault(); e.stopPropagation(); toggleHit(j);
-      star.className='job-save'+(onHitList(j.id)?' on':''); star.innerHTML=onHitList(j.id)?'\u2605':'\u2606';
-      // refresh the Hit List tab count
+      // update the Hit List tab count, then re-draw so the starred job leaves Alerts
       var tab=document.querySelector('#pages button[data-page="hitlist"]'); if(tab) tab.textContent='Hit List'+(S.hitList.length?' ('+S.hitList.length+')':'');
+      drawAlertResults(q,d);
     };
     var dis=document.createElement('button'); dis.className='job-dismiss'; dis.innerHTML='&#10005;'; dis.title='Dismiss (clears for everyone)';
     dis.onclick=function(e){ e.preventDefault(); e.stopPropagation(); S.alertsDismissed[j.id]=true; saveLocal(); pushRemote(true); drawAlertResults(q,d); };
