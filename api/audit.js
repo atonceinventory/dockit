@@ -1,4 +1,4 @@
-// Dockit -> Store Audit. Runs everything from a single URL:
+// Docket -> Store Audit. Runs everything from a single URL:
 //   1) Google PageSpeed Insights (Lighthouse) performance + Core Web Vitals
 //   2) Page fetch -> Shopify detection, theme, and third-party app fingerprints
 //
@@ -57,7 +57,7 @@ async function fetchHtml(url) {
   try {
     var r = await fetch(url, {
       redirect: 'follow', signal: ctrl.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DockitAudit/1.0; +https://personaldocket.com)' }
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DocketAudit/1.0; +https://personaldocket.com)' }
     });
     var headers = {};
     r.headers.forEach(function (v, k) { headers[k.toLowerCase()] = v; });

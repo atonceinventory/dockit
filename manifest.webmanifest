@@ -1,6 +1,6 @@
 {
-  "name": "Dockit",
-  "short_name": "Dockit",
+  "name": "Docket",
+  "short_name": "Docket",
   "description": "Team hub for tasks, projects and job alerts across At Once, Good Morning Charlie and Logistics Pit.",
   "start_url": "./index.html",
   "scope": "./",

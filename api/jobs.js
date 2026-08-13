@@ -1,4 +1,4 @@
-// Dockit -> Adzuna Jobs API proxy.
+// Docket -> Adzuna Jobs API proxy.
 //
 // Pulls live job listings for a search (what + where) from Adzuna, the
 // legitimate AU job aggregator. Credentials are read from environment
