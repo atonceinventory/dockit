@@ -385,6 +385,15 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .job-save:hover{background:rgba(201,154,30,.25)}
 .job-save.on{color:#c99a1e}
 .hit-item{border-left-color:#c99a1e}
+.ct-tbl{display:flex;flex-direction:column;gap:6px}
+.ct-row{display:grid;grid-template-columns:1.4fr 1.4fr 1fr 1.8fr 42px;gap:8px;align-items:center}
+.ct-head{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--fg-mut);text-transform:uppercase;padding:0 2px}
+.ct-head .ct-c{padding:0 4px}
+.ct-in{width:100%;font-family:var(--sans);font-size:14px;padding:9px 10px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
+.ct-del{display:flex;justify-content:center}
+.ct-x{width:34px;height:34px;color:var(--fg-dim);border:1px solid var(--line);background:var(--surface-2);cursor:pointer}
+.ct-x:hover{background:#a83232;color:#fff}
+@media(max-width:820px){.ct-row{grid-template-columns:1fr 1fr;gap:6px}.ct-head{display:none}.ct-del{grid-column:1/-1;justify-content:flex-end}}
 /* store audit */
 .aud-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 2px 18px}
 .aud-url{flex:2;min-width:220px;font-family:var(--sans);font-size:15px;padding:11px 13px;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;color:#12143a}
@@ -1325,7 +1334,8 @@ function sharedPayload(){
     alertSearches: S.alertSearches || [],
     alertsDismissed: S.alertsDismissed || {},
     alertSeedVersion: S.alertSeedVersion || 0,
-    hitList: S.hitList || []
+    hitList: S.hitList || [],
+    contacts: S.contacts || []
   };
 }
 function privatePayload(){
@@ -1352,6 +1362,9 @@ function applyRemoteScope(data, laneKeys){
   }
   if(laneKeys.indexOf('gmc')!==-1 && Array.isArray(data.hitList)){
     S.hitList = data.hitList;
+  }
+  if(laneKeys.indexOf('gmc')!==-1 && Array.isArray(data.contacts)){
+    S.contacts = data.contacts;
   }
   if(laneKeys.indexOf('gmc')!==-1 && typeof data.alertSeedVersion==='number'){
     S.alertSeedVersion = data.alertSeedVersion;
@@ -1467,6 +1480,7 @@ if(!S.alertSearches) S.alertSearches=[];  // GMC job-alert searches (shared)
 if(!S.alertLoc) S.alertLoc='Perth';       // global location filter (local view pref)
 if(!S.alertType) S.alertType='all';       // job type filter: all|contract|permanent (local)
 if(!S.hitList) S.hitList=[];              // saved job leads to contact (shared)
+if(!S.contacts) S.contacts=[];            // existing client contacts (shared)
 if(!S.alertsSeen) S.alertsSeen={};        // job id -> true (NEW badges, local)
 if(!S.alertsDismissed) S.alertsDismissed={};// job id -> true (dismissed, SHARED)
 var hub = null;                          // chosen business (null = picker)
@@ -2712,6 +2726,51 @@ function downloadAuditMd(d){
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
 }
 
+/* ═══ Contacts — existing client address book (shared) ════ */
+function renderContacts(){
+  sheet.innerHTML='';
+  var head=document.createElement('div'); head.className='proj-head';
+  var h=document.createElement('h2'); h.textContent='Contacts';
+  var sub=document.createElement('span'); sub.className='sub'; sub.textContent=S.contacts.length+(S.contacts.length===1?' client':' clients');
+  head.appendChild(h); head.appendChild(sub);
+  var add=document.createElement('button'); add.className='newp'; add.textContent='+ New contact';
+  add.onclick=function(){ S.contacts.unshift({id:uid(),name:'',company:'',phone:'',email:''}); saveLocal(); pushRemote(true); render(); };
+  head.appendChild(add);
+  sheet.appendChild(head);
+
+  var hint=document.createElement('p'); hint.className='as-autohint';
+  hint.textContent='Your existing GMC clients. Shared with your team.';
+  sheet.appendChild(hint);
+
+  if(!S.contacts.length){
+    sheet.appendChild(emptyState('No contacts yet','Add a client with the New contact button.'));
+    return;
+  }
+
+  // header row (desktop)
+  var tbl=document.createElement('div'); tbl.className='ct-tbl';
+  var thr=document.createElement('div'); thr.className='ct-row ct-head';
+  ['Name','Company','Phone','Email',''].forEach(function(t){ var c=document.createElement('div'); c.className='ct-c'; c.textContent=t; thr.appendChild(c); });
+  tbl.appendChild(thr);
+
+  S.contacts.forEach(function(c){
+    var row=document.createElement('div'); row.className='ct-row';
+    [['name','Name'],['company','Company'],['phone','Phone'],['email','Email']].forEach(function(f){
+      var cell=document.createElement('div'); cell.className='ct-c';
+      var inp=document.createElement('input'); inp.className='ct-in'; inp.value=c[f[0]]||''; inp.placeholder=f[1];
+      if(f[0]==='phone') inp.type='tel'; if(f[0]==='email') inp.type='email';
+      inp.onchange=function(){ c[f[0]]=inp.value; saveLocal(); pushRemote(true); if(f[0]==='name') render(); };
+      cell.appendChild(inp); row.appendChild(cell);
+    });
+    var del=document.createElement('div'); del.className='ct-c ct-del';
+    var db=document.createElement('button'); db.className='ct-x'; db.innerHTML='&#10005;'; db.title='Delete contact';
+    db.onclick=function(){ if(confirm('Delete '+(c.name||'this contact')+'?')){ S.contacts=S.contacts.filter(function(x){return x.id!==c.id;}); saveLocal(); pushRemote(true); render(); } };
+    del.appendChild(db); row.appendChild(del);
+    tbl.appendChild(row);
+  });
+  sheet.appendChild(tbl);
+}
+
 /* ═══ Hit List — saved leads to contact (shared) ══════════ */
 function renderHitList(){
   sheet.innerHTML='';
@@ -2801,7 +2860,7 @@ function render(){
 
   // per-business tabs
   var TABS = {
-    gmc:[['tasks','Tasks'],['projects','Projects'],['notifs','Alerts'],['hitlist','Hit List'+((S.hitList&&S.hitList.length)?' ('+S.hitList.length+')':'')],['audit','Audit']],
+    gmc:[['tasks','Tasks'],['projects','Projects'],['notifs','Alerts'],['hitlist','Hit List'+((S.hitList&&S.hitList.length)?' ('+S.hitList.length+')':'')],['contacts','Contacts'+((S.contacts&&S.contacts.length)?' ('+S.contacts.length+')':'')],['audit','Audit']],
     pit:[['tasks','Tasks'],['grid','Grid']]
   };
   var tabs = TABS[hub] || null;
@@ -2835,6 +2894,7 @@ function render(){
   if(S.page==='notifs'){ document.getElementById('headcount').textContent=''; renderNotifs(); return; }
   if(S.page==='grid'){ document.getElementById('headcount').textContent=''; renderGridPage(); return; }
   if(S.page==='hitlist'){ document.getElementById('headcount').textContent=''; renderHitList(); return; }
+  if(S.page==='contacts'){ document.getElementById('headcount').textContent=''; renderContacts(); return; }
   if(S.page==='audit'){ document.getElementById('headcount').textContent=''; renderAudit(); return; }
 
   var dockEl=document.getElementById('dock'); if(dockEl) dockEl.style.display='none';  // business is the scope
