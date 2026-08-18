@@ -2534,7 +2534,7 @@ function drawAudit(d, out){
   var aihead=document.createElement('div'); aihead.style.display='flex'; aihead.style.justifyContent='space-between'; aihead.style.alignItems='center'; aihead.style.gap='10px';
   aihead.innerHTML='<h3 style="margin:0">AI action briefing</h3>';
   var aibtn=document.createElement('button'); aibtn.className='aud-ai';
-  aibtn.textContent = auditState.insights ? 'Regenerate' : '\u2728 Generate AI insights';
+  aibtn.textContent = auditState.insights ? 'Regenerate' : 'Generate AI insights';
   aibtn.disabled = auditState.insightsRunning;
   if(auditState.insightsRunning) aibtn.textContent='Thinking\u2026';
   aibtn.onclick=function(){ genInsights(d); };
