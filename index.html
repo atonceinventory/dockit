@@ -956,9 +956,18 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
 .pj-del:hover{color:#fff}
 .pj-time{font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.9);font-variant-numeric:tabular-nums}
 .pj-time.live{color:#e9ce5c;font-weight:700}
-.pj-timer{font-family:var(--sans);font-size:12px;font-weight:700;color:#fff;border:1px solid rgba(255,255,255,.4);background:none;padding:5px 12px;cursor:pointer}
-.pj-timer:hover{background:rgba(255,255,255,.15)}
-.pj-timer.on{background:#a83232;border-color:#a83232}
+.pj2-item{display:flex;flex-direction:column}
+.pj2-ttime{flex:none;font-family:var(--sans);font-size:12px;color:var(--fg-mut);font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+.pj2-ttime.live{color:#8a6a10;font-weight:700}
+.pj2-timer{flex:none;font-family:var(--sans);font-size:12px;font-weight:700;color:var(--navy);border:1px solid var(--line-2);background:var(--surface-2);padding:5px 11px;cursor:pointer}
+.pj2-timer:hover{background:var(--surface-3)}
+.pj2-timer.on{background:#a83232;color:#fff;border-color:#a83232}
+.pj2-chev{flex:none;width:22px;color:var(--fg-dim);background:none;border:none;font-size:12px;cursor:pointer;transition:transform .12s;line-height:1}
+.pj2-chev.open{transform:rotate(180deg);color:var(--navy)}
+.pj2-chev.has{color:var(--gmc)}
+.pj2-chev.has.open{color:var(--navy)}
+.pj2-notes{background:var(--surface-2);border:1px solid var(--line);border-top:none;padding:8px 12px 10px}
+.pj2-notes-ta{width:100%;min-height:70px;resize:vertical;font-family:var(--sans);font-size:13.5px;line-height:1.5;color:#12143a;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;padding:9px 11px;box-sizing:border-box}
 .pj-breakdown{font-family:var(--sans);font-size:12px;color:var(--fg-mut);background:var(--surface-2);border:1px solid var(--line);border-top:none;padding:6px 12px}
 /* clean card list */
 .pj2-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
@@ -2221,18 +2230,32 @@ function projectPct(p){
 function personLabel(em){ em=(em||'').toLowerCase(); if(em.indexOf('griffgamble1')!==-1) return 'Griff'; if(em.indexOf('byhollyholiday')!==-1) return 'Holly'; if(em.indexOf('hello@gm-charlie')!==-1) return 'GMC'; return em.split('@')[0]||'User'; }
 // ── project time tracking (per user, start/stop timer) ──
 var _timerInt=null;
+var notesOpen={}; // runtime: which task notes are expanded (per session, local)
 function fmtDur(sec){ sec=Math.max(0,Math.round(sec)); var h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60); if(h) return h+'h '+(m<10?'0':'')+m+'m'; if(m) return m+'m'; return sec+'s'; }
 function bankTimer(now){
   if(!S.timer) return;
-  var p=(S.projects||[]).filter(function(x){return x.id===S.timer.projectId;})[0];
-  if(p){ if(!p.time) p.time={}; var em=emailLc()||'me'; p.time[em]=(p.time[em]||0)+Math.round((now-S.timer.startedAt)/1000); }
+  var p=(S.projects||[]).filter(function(x){return x.id===S.timer.projectId;})[0]; if(!p) return;
+  var t=(p.tasks||[]).filter(function(x){return x.id===S.timer.taskId;})[0]; if(!t) return;
+  if(!t.time) t.time={}; var em=emailLc()||'me';
+  t.time[em]=(t.time[em]||0)+Math.round((now-S.timer.startedAt)/1000);
 }
-function toggleTimer(pid){
+function toggleTaskTimer(pid,tid){
   var now=Date.now();
-  if(S.timer && S.timer.projectId===pid){ bankTimer(now); S.timer=null; saveLocal(); pushRemote(true); render(); }
-  else { if(S.timer) bankTimer(now); S.timer={projectId:pid, startedAt:now}; saveLocal(); pushRemote(true); render(); }
+  if(S.timer && S.timer.taskId===tid){ bankTimer(now); S.timer=null; }
+  else { if(S.timer) bankTimer(now); S.timer={projectId:pid, taskId:tid, startedAt:now}; }
+  saveLocal(); pushRemote(true); render();
 }
-function projectTotalSec(p){ var t=0, tm=p.time||{}; Object.keys(tm).forEach(function(k){ t+=tm[k]||0; }); if(S.timer && S.timer.projectId===p.id) t+=(Date.now()-S.timer.startedAt)/1000; return t; }
+function taskTotalSec(t){ var s=0, tm=t.time||{}; Object.keys(tm).forEach(function(k){ s+=tm[k]||0; }); if(S.timer && S.timer.taskId===t.id) s+=(Date.now()-S.timer.startedAt)/1000; return s; }
+function projectBreakdown(p){
+  var agg={};
+  (p.tasks||[]).forEach(function(t){ var tm=t.time||{}; Object.keys(tm).forEach(function(k){ agg[k]=(agg[k]||0)+tm[k]; }); });
+  var lt=p.time||{}; Object.keys(lt).forEach(function(k){ agg[k]=(agg[k]||0)+lt[k]; }); // legacy project-level time
+  if(S.timer && S.timer.projectId===p.id){ var em=emailLc()||'me'; agg[em]=(agg[em]||0)+(Date.now()-S.timer.startedAt)/1000; }
+  return agg;
+}
+function projectTotalSec(p){ var b=projectBreakdown(p), s=0; Object.keys(b).forEach(function(k){ s+=b[k]; }); return s; }
+function breakdownStr(p){ var b=projectBreakdown(p); var parts=Object.keys(b).filter(function(k){return b[k]>=1;}).map(function(k){ return personLabel(k)+' '+fmtDur(b[k]); }); return parts.join('  \u00b7  ')||'\u2014'; }
+
 
 function projectAtRisk(p){
   return (p.tasks||[]).some(function(t){ return t.status!=='complete' && t.due && isoToDate(t.due) < isoToDate(todayISO()); });
@@ -2260,8 +2283,11 @@ function renderProjects(){
   }
   S.projects.forEach(function(p){ sheet.appendChild(projectBlock(p)); });
   if(S.timer){ _timerInt=setInterval(function(){
-    var lbl=document.querySelector('.pj-time.live[data-pid="'+S.timer.projectId+'"]');
-    if(lbl){ var pp=S.projects.filter(function(x){return x.id===S.timer.projectId;})[0]; if(pp) lbl.textContent='\u23f1 '+fmtDur(projectTotalSec(pp)); }
+    var pp=S.projects.filter(function(x){return x.id===S.timer.projectId;})[0]; if(!pp) return;
+    var tk=(pp.tasks||[]).filter(function(x){return x.id===S.timer.taskId;})[0];
+    var tot=document.querySelector('.pj-time.live[data-pid="'+pp.id+'"]'); if(tot) tot.textContent='\u23f1 '+fmtDur(projectTotalSec(pp));
+    var tl=document.querySelector('.pj2-ttime.live[data-tid="'+S.timer.taskId+'"]'); if(tl && tk) tl.textContent=fmtDur(taskTotalSec(tk));
+    var brk=document.querySelector('.pj-breakdown[data-pid="'+pp.id+'"]'); if(brk) brk.textContent='Time logged: '+breakdownStr(pp);
   },1000); }
 }
 
@@ -2283,24 +2309,20 @@ function projectBlock(p){
   hd.appendChild(nm); hd.appendChild(prog);
   if(projectAtRisk(p)){ var r=document.createElement('span'); r.className='pj-risk'; r.textContent='At risk'; hd.appendChild(r); }
 
-  // timer: total time + start/stop for current user
+  // rolled-up total time from all tasks
   var running = S.timer && S.timer.projectId===p.id;
   var ttl=document.createElement('span'); ttl.className='pj-time'+(running?' live':''); ttl.dataset.pid=p.id;
   ttl.textContent='\u23f1 '+fmtDur(projectTotalSec(p));
-  var tb=document.createElement('button'); tb.className='pj-timer'+(running?' on':'');
-  tb.textContent = running ? 'Stop' : 'Start';
-  tb.onclick=function(){ toggleTimer(p.id); };
-  hd.appendChild(ttl); hd.appendChild(tb);
+  hd.appendChild(ttl);
 
   hd.appendChild(db); hd.appendChild(del);
   block.appendChild(hd);
 
-  // per-person time breakdown (if any logged)
-  var tm=p.time||{}; var names=Object.keys(tm).filter(function(k){return tm[k]>0;});
-  if(names.length || running){
-    var brk=document.createElement('div'); brk.className='pj-breakdown';
-    var parts=names.map(function(k){ return personLabel(k)+' '+fmtDur(tm[k]); });
-    brk.textContent='Time logged: '+(parts.join('  \u00b7  ')||'\u2014');
+  // per-person breakdown (rolled up from tasks)
+  var bd=projectBreakdown(p); var hasTime=Object.keys(bd).some(function(k){return bd[k]>=1;});
+  if(hasTime || running){
+    var brk=document.createElement('div'); brk.className='pj-breakdown'; brk.dataset.pid=p.id;
+    brk.textContent='Time logged: '+breakdownStr(p);
     block.appendChild(brk);
   }
 
@@ -2316,20 +2338,28 @@ function projectBlock(p){
 }
 
 function projectTaskCard(p,t){
+  var wrap=document.createElement('div'); wrap.className='pj2-item';
   var card=document.createElement('div'); card.className='pj2-card'; card.dataset.s=t.status||'notstarted';
 
-  // complete toggle (checkbox) — flips status between complete and notstarted
+  // complete toggle
   var chk=document.createElement('button'); chk.className='pj2-chk'+(t.status==='complete'?' on':'');
   chk.innerHTML=t.status==='complete'?'&#10003;':'';
   chk.onclick=function(){ t.status=(t.status==='complete'?'notstarted':'complete'); save(); render(); };
   card.appendChild(chk);
 
-  // title
+  // title (click opens notes; still editable)
   var title=document.createElement('input'); title.className='pj2-title'+(t.status==='complete'?' done':''); title.value=t.title||''; title.placeholder='Task name';
   title.onchange=function(){ t.title=title.value; saveLocal(); pushRemote(true); };
+  title.onclick=function(){ if(!notesOpen[t.id]){ notesOpen[t.id]=true; render(); } };
   card.appendChild(title);
 
-  // status pill (select)
+  // notes toggle chevron
+  var chev=document.createElement('button'); chev.className='pj2-chev'+(notesOpen[t.id]?' open':'')+((t.notes&&t.notes.trim())?' has':'');
+  chev.innerHTML='&#9662;'; chev.title=notesOpen[t.id]?'Hide notes':'Notes';
+  chev.onclick=function(e){ e.stopPropagation(); notesOpen[t.id]=!notesOpen[t.id]; render(); };
+  card.appendChild(chev);
+
+  // status
   var ss=document.createElement('select'); ss.className='pj2-status'; ss.dataset.s=t.status||'notstarted';
   PSTATUS.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(t.status===o[0])op.selected=true; ss.appendChild(op); });
   ss.onchange=function(){ t.status=ss.value; save(); render(); };
@@ -2347,11 +2377,33 @@ function projectTaskCard(p,t){
   dd.onclick=function(){ openCal(t.due, function(iso){ t.due=iso; save(); render(); }); };
   card.appendChild(dd);
 
+  // per-task timer
+  var tRunning = S.timer && S.timer.taskId===t.id;
+  var tt=document.createElement('span'); tt.className='pj2-ttime'+(tRunning?' live':''); tt.dataset.tid=t.id;
+  tt.textContent=fmtDur(taskTotalSec(t));
+  card.appendChild(tt);
+  var tb=document.createElement('button'); tb.className='pj2-timer'+(tRunning?' on':'');
+  tb.textContent=tRunning?'Stop':'Start';
+  tb.onclick=function(){ toggleTaskTimer(p.id,t.id); };
+  card.appendChild(tb);
+
   // delete
   var kill=document.createElement('button'); kill.className='pj2-kill'; kill.innerHTML='&#10005;'; kill.title='Remove task';
-  kill.onclick=function(){ p.tasks=p.tasks.filter(function(x){return x.id!==t.id;}); save(); render(); };
+  kill.onclick=function(){ if(S.timer&&S.timer.taskId===t.id)S.timer=null; p.tasks=p.tasks.filter(function(x){return x.id!==t.id;}); save(); render(); };
   card.appendChild(kill);
-  return card;
+
+  wrap.appendChild(card);
+
+  // inline notes panel
+  if(notesOpen[t.id]){
+    var np=document.createElement('div'); np.className='pj2-notes';
+    var ta=document.createElement('textarea'); ta.className='pj2-notes-ta'; ta.placeholder='Jot notes for this task\u2026'; ta.value=t.notes||'';
+    ta.oninput=function(){ t.notes=ta.value; };
+    ta.onchange=function(){ t.notes=ta.value; saveLocal(); pushRemote(true); render(); };
+    np.appendChild(ta);
+    wrap.appendChild(np);
+  }
+  return wrap;
 }
 
 /* ═══ Alerts / notification centre (placeholder) ══════════ */
