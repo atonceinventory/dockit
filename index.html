@@ -262,7 +262,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .due.add{border-style:dashed;color:var(--fg-dim)}
 .due.add:active{color:var(--fg)}
 .due.far{border-color:var(--line-2);color:var(--fg-mut)}
-.due.soon{border-color:rgba(255,213,49,.5);color:var(--gmc);background:rgba(255,213,49,.10)}
+.due.soon{border-color:#c99a1e;color:#7a5a08;background:rgba(233,206,92,.35)}
 .due.today{border-color:var(--stamp);color:#fff;background:var(--stamp)}
 .due.overdue{border-color:var(--stamp);color:var(--stamp);background:rgba(255,98,87,.14)}
 .due-x{font-size:11px;color:var(--fg-dim);padding:2px 4px}
@@ -930,6 +930,38 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
 .pj-risk{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;background:#a83232;color:#fff;padding:3px 8px}
 .pj-del{color:rgba(255,255,255,.7);font-size:14px;padding:2px 6px}
 .pj-del:hover{color:#fff}
+/* clean card list */
+.pj2-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pj2-card{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line-2);padding:9px 12px}
+.pj2-card[data-s="complete"]{border-left-color:#2f8f4e;opacity:.72}
+.pj2-card[data-s="inprogress"]{border-left-color:#3f6fd0}
+.pj2-card[data-s="review"]{border-left-color:#5a64f2}
+.pj2-card[data-s="hold"]{border-left-color:#c99a1e}
+.pj2-card[data-s="notstarted"]{border-left-color:#9a9db5}
+.pj2-chk{flex:none;width:24px;height:24px;border:2px solid #9a9db5;background:#fff;color:#fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.pj2-chk.on{background:#2f8f4e;border-color:#2f8f4e}
+.pj2-title{flex:1;min-width:0;background:none;border:none;font-family:var(--sans);font-size:15px;color:#12143a;padding:4px 2px}
+.pj2-title:focus{outline:2px solid var(--aoi);outline-offset:-2px}
+.pj2-title.done{text-decoration:line-through;color:var(--fg-mut)}
+.pj2-status{flex:none;font-family:var(--sans);font-size:12px;font-weight:700;border:1px solid var(--line-2);padding:5px 8px;cursor:pointer;text-transform:capitalize}
+.pj2-status[data-s="complete"]{background:rgba(47,143,78,.15);color:#2f8f4e;border-color:#2f8f4e}
+.pj2-status[data-s="inprogress"]{background:rgba(63,111,208,.14);color:#3f6fd0;border-color:#3f6fd0}
+.pj2-status[data-s="review"]{background:rgba(90,100,242,.14);color:#5a64f2;border-color:#5a64f2}
+.pj2-status[data-s="hold"]{background:rgba(201,154,30,.16);color:#8a6a10;border-color:#c99a1e}
+.pj2-status[data-s="notstarted"]{background:var(--surface-2);color:var(--fg-mut)}
+.pj2-person{flex:none;font-family:var(--sans);font-size:12px;color:#12143a;border:1px solid var(--line-2);background:var(--surface-2);padding:5px 6px;cursor:pointer}
+.pj2-due{flex:none;font-family:var(--sans);font-size:12px;color:var(--fg-mut);border:1px solid var(--line-2);background:none;padding:5px 9px;cursor:pointer}
+.pj2-due:hover{background:var(--surface-2)}
+.pj2-due.soon{border-color:#c99a1e;color:#7a5a08;background:rgba(233,206,92,.35)}
+.pj2-due.today{border-color:var(--stamp);color:#fff;background:var(--stamp)}
+.pj2-due.overdue{border-color:var(--stamp);color:var(--stamp);background:rgba(255,98,87,.14)}
+.pj2-kill{flex:none;color:var(--fg-dim);font-size:13px;padding:4px 7px;cursor:pointer;border:none;background:none}
+.pj2-kill:hover{color:#a83232}
+@media (max-width:720px){
+  .pj2-card{flex-wrap:wrap}
+  .pj2-title{flex:1 1 60%}
+  .pj2-status,.pj2-person,.pj2-due{font-size:11px}
+}
 .pj-table{border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;border-top:none;background:var(--surface)}
 .pj-row{display:grid;grid-template-columns:1.6fr 128px 108px 104px 92px 1.4fr 34px;align-items:stretch;border-bottom:1px solid var(--line)}
 .pj-th{background:var(--surface-3);font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-mut)}
@@ -2185,7 +2217,7 @@ function projectBlock(p){
   if(!p.tasks) p.tasks=[];
   var block=document.createElement('div'); block.className='pj-block'; block.setAttribute('data-pid',p.id);
 
-  // project subheading
+  // project heading
   var hd=document.createElement('div'); hd.className='pj-head';
   var nm=document.createElement('input'); nm.className='pj-name'; nm.value=p.name||''; nm.placeholder='Project name';
   nm.onchange=function(){ p.name=nm.value; saveLocal(); pushRemote(true); };
@@ -2194,21 +2226,17 @@ function projectBlock(p){
   var db=document.createElement('button'); db.className='pj-deadline';
   db.textContent = p.deadline ? ('Due '+fmtDue(p.deadline).label) : '+ Deadline';
   db.onclick=function(){ openCal(p.deadline, function(iso){ p.deadline=iso; save(); render(); }); };
-  if(projectAtRisk(p)){ var r=document.createElement('span'); r.className='pj-risk'; r.textContent='At risk'; hd.appendChild(r); }
   var del=document.createElement('button'); del.className='pj-del'; del.innerHTML='&#10005;'; del.title='Delete project';
   del.onclick=function(){ if(confirm('Delete "'+(p.name||'this project')+'" and its tasks?')){ S.projects=S.projects.filter(function(x){return x.id!==p.id;}); save(); render(); } };
-  hd.insertBefore(nm, hd.firstChild);
-  hd.appendChild(prog); hd.appendChild(db); hd.appendChild(del);
+  hd.appendChild(nm); hd.appendChild(prog);
+  if(projectAtRisk(p)){ var r=document.createElement('span'); r.className='pj-risk'; r.textContent='At risk'; hd.appendChild(r); }
+  hd.appendChild(db); hd.appendChild(del);
   block.appendChild(hd);
 
-  // table
-  var table=document.createElement('div'); table.className='pj-table';
-  var th=document.createElement('div'); th.className='pj-row pj-th';
-  ['Task','Status','Priority','Due','Person','Notes',''].forEach(function(c){ var s=document.createElement('span'); s.textContent=c; th.appendChild(s); });
-  table.appendChild(th);
-
-  p.tasks.forEach(function(t){ table.appendChild(projectTaskRow(p,t)); });
-  block.appendChild(table);
+  // task cards
+  var list=document.createElement('div'); list.className='pj2-list';
+  p.tasks.forEach(function(t){ list.appendChild(projectTaskCard(p,t)); });
+  block.appendChild(list);
 
   var add=document.createElement('button'); add.className='pj-add'; add.textContent='+ Add task';
   add.onclick=function(){ p.tasks.push({ id:uid(), title:'', status:'notstarted', prio:'medium', due:null, assignee:'griff', notes:'' }); save(); render(); };
@@ -2216,44 +2244,43 @@ function projectBlock(p){
   return block;
 }
 
-function projectTaskRow(p,t){
-  var row=document.createElement('div'); row.className='pj-row';
+function projectTaskCard(p,t){
+  var card=document.createElement('div'); card.className='pj2-card'; card.dataset.s=t.status||'notstarted';
 
-  var title=document.createElement('input'); title.className='pj-c pj-task'; title.value=t.title||''; title.placeholder='Task';
+  // complete toggle (checkbox) — flips status between complete and notstarted
+  var chk=document.createElement('button'); chk.className='pj2-chk'+(t.status==='complete'?' on':'');
+  chk.innerHTML=t.status==='complete'?'&#10003;':'';
+  chk.onclick=function(){ t.status=(t.status==='complete'?'notstarted':'complete'); save(); render(); };
+  card.appendChild(chk);
+
+  // title
+  var title=document.createElement('input'); title.className='pj2-title'+(t.status==='complete'?' done':''); title.value=t.title||''; title.placeholder='Task name';
   title.onchange=function(){ t.title=title.value; saveLocal(); pushRemote(true); };
-  row.appendChild(title);
+  card.appendChild(title);
 
-  var st=document.createElement('span'); st.className='pj-c pf status'; st.dataset.s=t.status||'notstarted';
-  var ss=document.createElement('select');
+  // status pill (select)
+  var ss=document.createElement('select'); ss.className='pj2-status'; ss.dataset.s=t.status||'notstarted';
   PSTATUS.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(t.status===o[0])op.selected=true; ss.appendChild(op); });
   ss.onchange=function(){ t.status=ss.value; save(); render(); };
-  st.appendChild(ss); row.appendChild(st);
+  card.appendChild(ss);
 
-  var pr=document.createElement('span'); pr.className='pj-c pf prio'; pr.dataset.p=t.prio||'medium';
-  var ps=document.createElement('select');
-  PPRIO.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(t.prio===o[0])op.selected=true; ps.appendChild(op); });
-  ps.onchange=function(){ t.prio=ps.value; save(); render(); };
-  pr.appendChild(ps); row.appendChild(pr);
-
-  var dd=document.createElement('button'); dd.className='pj-c pj-date';
-  dd.textContent = t.due ? fmtDue(t.due).label : '+ Date';
-  dd.onclick=function(){ openCal(t.due, function(iso){ t.due=iso; save(); render(); }); };
-  row.appendChild(dd);
-
-  var asg=document.createElement('span'); asg.className='pj-c';
-  var as=document.createElement('select');
+  // person
+  var as=document.createElement('select'); as.className='pj2-person';
   [['griff','Griff'],['holly','Holly'],['hello','GMC']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(t.assignee===o[0])op.selected=true; as.appendChild(op); });
   as.onchange=function(){ t.assignee=as.value; saveLocal(); pushRemote(true); };
-  asg.appendChild(as); row.appendChild(asg);
+  card.appendChild(as);
 
-  var notes=document.createElement('input'); notes.className='pj-c pj-notes'; notes.value=t.notes||''; notes.placeholder='\u2013';
-  notes.onchange=function(){ t.notes=notes.value; saveLocal(); pushRemote(true); };
-  row.appendChild(notes);
+  // due
+  var dd=document.createElement('button'); dd.className='pj2-due'+(t.due?(' '+fmtDue(t.due).cls):'');
+  dd.textContent = t.due ? fmtDue(t.due).label : '+ Date';
+  dd.onclick=function(){ openCal(t.due, function(iso){ t.due=iso; save(); render(); }); };
+  card.appendChild(dd);
 
-  var kill=document.createElement('button'); kill.className='pj-c pj-kill'; kill.innerHTML='&#10005;'; kill.title='Remove task';
+  // delete
+  var kill=document.createElement('button'); kill.className='pj2-kill'; kill.innerHTML='&#10005;'; kill.title='Remove task';
   kill.onclick=function(){ p.tasks=p.tasks.filter(function(x){return x.id!==t.id;}); save(); render(); };
-  row.appendChild(kill);
-  return row;
+  card.appendChild(kill);
+  return card;
 }
 
 /* ═══ Alerts / notification centre (placeholder) ══════════ */
