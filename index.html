@@ -930,6 +930,12 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
 .pj-risk{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;background:#a83232;color:#fff;padding:3px 8px}
 .pj-del{color:rgba(255,255,255,.7);font-size:14px;padding:2px 6px}
 .pj-del:hover{color:#fff}
+.pj-time{font-family:var(--sans);font-size:12px;color:rgba(255,255,255,.9);font-variant-numeric:tabular-nums}
+.pj-time.live{color:#e9ce5c;font-weight:700}
+.pj-timer{font-family:var(--sans);font-size:12px;font-weight:700;color:#fff;border:1px solid rgba(255,255,255,.4);background:none;padding:5px 12px;cursor:pointer}
+.pj-timer:hover{background:rgba(255,255,255,.15)}
+.pj-timer.on{background:#a83232;border-color:#a83232}
+.pj-breakdown{font-family:var(--sans);font-size:12px;color:var(--fg-mut);background:var(--surface-2);border:1px solid var(--line);border-top:none;padding:6px 12px}
 /* clean card list */
 .pj2-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .pj2-card{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line-2);padding:9px 12px}
@@ -1520,6 +1526,7 @@ if(!S.logos) S.logos={}; if(S.filter===undefined) S.filter=null;
 if(!S.kind) S.kind='task';               // what the capture bar adds
 if(!S.page) S.page='tasks';              // tasks | projects | notifs
 if(!S.projects) S.projects=[];           // GMC project tracker (shared)
+if(S.timer===undefined) S.timer=null;     // active time-tracking timer (local per user)
 if(!S.alertSearches) S.alertSearches=[];  // GMC job-alert searches (shared)
 if(!S.alertLoc) S.alertLoc='Perth';       // global location filter (local view pref)
 if(!S.alertType) S.alertType='all';       // job type filter: all|contract|permanent (local)
@@ -2187,12 +2194,29 @@ function projectPct(p){
   var sum = p.tasks.reduce(function(a,t){ return a + (t.status==='complete'?100:(+t.pct||0)); }, 0);
   return Math.round(sum / p.tasks.length);
 }
+function personLabel(em){ em=(em||'').toLowerCase(); if(em.indexOf('griffgamble1')!==-1) return 'Griff'; if(em.indexOf('byhollyholiday')!==-1) return 'Holly'; if(em.indexOf('hello@gm-charlie')!==-1) return 'GMC'; return em.split('@')[0]||'User'; }
+// ── project time tracking (per user, start/stop timer) ──
+var _timerInt=null;
+function fmtDur(sec){ sec=Math.max(0,Math.round(sec)); var h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60); if(h) return h+'h '+(m<10?'0':'')+m+'m'; if(m) return m+'m'; return sec+'s'; }
+function bankTimer(now){
+  if(!S.timer) return;
+  var p=(S.projects||[]).filter(function(x){return x.id===S.timer.projectId;})[0];
+  if(p){ if(!p.time) p.time={}; var em=emailLc()||'me'; p.time[em]=(p.time[em]||0)+Math.round((now-S.timer.startedAt)/1000); }
+}
+function toggleTimer(pid){
+  var now=Date.now();
+  if(S.timer && S.timer.projectId===pid){ bankTimer(now); S.timer=null; saveLocal(); pushRemote(true); render(); }
+  else { if(S.timer) bankTimer(now); S.timer={projectId:pid, startedAt:now}; saveLocal(); pushRemote(true); render(); }
+}
+function projectTotalSec(p){ var t=0, tm=p.time||{}; Object.keys(tm).forEach(function(k){ t+=tm[k]||0; }); if(S.timer && S.timer.projectId===p.id) t+=(Date.now()-S.timer.startedAt)/1000; return t; }
+
 function projectAtRisk(p){
   return (p.tasks||[]).some(function(t){ return t.status!=='complete' && t.due && isoToDate(t.due) < isoToDate(todayISO()); });
 }
 
 function renderProjects(){
   sheet.innerHTML='';
+  if(_timerInt){ clearInterval(_timerInt); _timerInt=null; }
 
   var head=document.createElement('div'); head.className='proj-head';
   var h=document.createElement('h2'); h.textContent='GMC Projects';
@@ -2211,6 +2235,10 @@ function renderProjects(){
     return;
   }
   S.projects.forEach(function(p){ sheet.appendChild(projectBlock(p)); });
+  if(S.timer){ _timerInt=setInterval(function(){
+    var lbl=document.querySelector('.pj-time.live[data-pid="'+S.timer.projectId+'"]');
+    if(lbl){ var pp=S.projects.filter(function(x){return x.id===S.timer.projectId;})[0]; if(pp) lbl.textContent='\u23f1 '+fmtDur(projectTotalSec(pp)); }
+  },1000); }
 }
 
 function projectBlock(p){
@@ -2227,11 +2255,30 @@ function projectBlock(p){
   db.textContent = p.deadline ? ('Due '+fmtDue(p.deadline).label) : '+ Deadline';
   db.onclick=function(){ openCal(p.deadline, function(iso){ p.deadline=iso; save(); render(); }); };
   var del=document.createElement('button'); del.className='pj-del'; del.innerHTML='&#10005;'; del.title='Delete project';
-  del.onclick=function(){ if(confirm('Delete "'+(p.name||'this project')+'" and its tasks?')){ S.projects=S.projects.filter(function(x){return x.id!==p.id;}); save(); render(); } };
+  del.onclick=function(){ if(confirm('Delete "'+(p.name||'this project')+'" and its tasks?')){ if(S.timer&&S.timer.projectId===p.id)S.timer=null; S.projects=S.projects.filter(function(x){return x.id!==p.id;}); save(); render(); } };
   hd.appendChild(nm); hd.appendChild(prog);
   if(projectAtRisk(p)){ var r=document.createElement('span'); r.className='pj-risk'; r.textContent='At risk'; hd.appendChild(r); }
+
+  // timer: total time + start/stop for current user
+  var running = S.timer && S.timer.projectId===p.id;
+  var ttl=document.createElement('span'); ttl.className='pj-time'+(running?' live':''); ttl.dataset.pid=p.id;
+  ttl.textContent='\u23f1 '+fmtDur(projectTotalSec(p));
+  var tb=document.createElement('button'); tb.className='pj-timer'+(running?' on':'');
+  tb.textContent = running ? 'Stop' : 'Start';
+  tb.onclick=function(){ toggleTimer(p.id); };
+  hd.appendChild(ttl); hd.appendChild(tb);
+
   hd.appendChild(db); hd.appendChild(del);
   block.appendChild(hd);
+
+  // per-person time breakdown (if any logged)
+  var tm=p.time||{}; var names=Object.keys(tm).filter(function(k){return tm[k]>0;});
+  if(names.length || running){
+    var brk=document.createElement('div'); brk.className='pj-breakdown';
+    var parts=names.map(function(k){ return personLabel(k)+' '+fmtDur(tm[k]); });
+    brk.textContent='Time logged: '+(parts.join('  \u00b7  ')||'\u2014');
+    block.appendChild(brk);
+  }
 
   // task cards
   var list=document.createElement('div'); list.className='pj2-list';
