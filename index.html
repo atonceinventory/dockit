@@ -72,7 +72,8 @@ button{background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--aoi);outline-offset:2px}
 
 /* ── top bar ─────────────────────────────── */
-.top{position:sticky;top:0;z-index:40;background:var(--bg)}
+.top{background:var(--bg)}
+.bar{position:sticky;top:0;z-index:50;background:var(--bg)}
 .bar{
   padding:calc(env(safe-area-inset-top,0px) + 14px) var(--pad) 10px;
   display:flex;align-items:baseline;gap:10px;
@@ -1099,15 +1100,15 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
 <body>
 <div class="app">
 
+<header class="bar" id="logobar">
+  <a class="bar-logo-wrap" href="#" onclick="return false"><img class="bar-logo" src="/docket_logo.png" alt="Docket"></a>
+  <div class="bar-right">
+    <span class="count" id="headcount"></span>
+    <span class="sub" id="datestamp"></span>
+    <button class="sync" id="syncpill" data-state="local" title="Account and sync"></button>
+  </div>
+</header>
 <div class="top" id="top">
-  <header class="bar">
-    <a class="bar-logo-wrap" href="#" onclick="return false"><img class="bar-logo" src="/docket_logo.png" alt="Docket"></a>
-    <div class="bar-right">
-      <span class="count" id="headcount"></span>
-      <span class="sub" id="datestamp"></span>
-      <button class="sync" id="syncpill" data-state="local" title="Account and sync"></button>
-    </div>
-  </header>
 
   <div class="pages" id="pages">
     <button data-page="tasks" aria-current="page">Tasks</button>
