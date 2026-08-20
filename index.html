@@ -10,11 +10,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Docket">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="apple-touch-icon.png?v=48">
-<link rel="icon" type="image/x-icon" href="favicon.ico?v=48">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=48">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=48">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=48">
+<link rel="apple-touch-icon" href="logos/apple-touch-icon.png?v=70">
+<link rel="icon" type="image/x-icon" href="logos/favicon.ico?v=70">
+<link rel="icon" type="image/png" sizes="32x32" href="logos/favicon-32.png?v=70">
+<link rel="icon" type="image/png" sizes="16x16" href="logos/favicon-16.png?v=70">
+<link rel="icon" type="image/png" sizes="192x192" href="logos/icon-192.png?v=70">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1110,7 +1110,7 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
 <div class="app">
 
 <header class="bar" id="logobar">
-  <a class="bar-logo-wrap" href="#" onclick="return false"><img class="bar-logo" src="/docket_logo.png" alt="Docket"></a>
+  <a class="bar-logo-wrap" href="#" onclick="return false"><img class="bar-logo" src="/logos/docket_logo.png" alt="Docket"></a>
   <div class="bar-right">
     <span class="count" id="headcount"></span>
     <span class="sub" id="datestamp"></span>
@@ -2110,7 +2110,7 @@ function renderSplash(){
   w.innerHTML =
     '<div class="gmc-ticker"><span>ANGELS SIGN IN PLEASE. &nbsp; \u2727 &nbsp; ANGELS SIGN IN PLEASE. &nbsp; \u2727 &nbsp;</span></div>'
     + '<div class="gate-wrap" style="margin-top:12vh">'
-    +   '<img class="brand-logo" src="/docket_logo.png" alt="Docket">'
+    +   '<img class="brand-logo" src="/logos/docket_logo.png" alt="Docket">'
     +   '<div class="splash-dots">Loading\u2026</div>'
     + '</div>';
   sheet.appendChild(w);
@@ -2133,7 +2133,7 @@ function renderLanding(){
 
   var gate=document.createElement('div'); gate.className='gate-wrap';
   gate.innerHTML =
-      '<img class="brand-logo" src="/docket_logo.png" alt="Docket">'
+      '<img class="brand-logo" src="/logos/docket_logo.png" alt="Docket">'
     + '<div class="gate-plaque">Private community \u00b7 Angels only</div>';
   w.appendChild(gate);
 
