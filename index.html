@@ -3922,7 +3922,7 @@ function stRenderProducts(body){
   ST.products.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
   ST.products.forEach(function(pr){
     var card=document.createElement('div');
-    card.style.cssText='display:flex;align-items:center;gap:12px;border:1px solid #b9bdd1;background:#fff;padding:8px 12px;margin-top:8px;cursor:pointer;';
+    card.style.cssText='display:flex;align-items:center;gap:12px;border:1px solid #b9bdd1;background:#fff;box-shadow:2px 2px 0 #9aa;padding:12px 14px;margin-top:10px;cursor:pointer;';
     var img=(pr.images&&pr.images[0])||'';
     var stock=(pr.variants||[]).reduce(function(n,v){ return n+(v.stock||0); },0);
     var price=(pr.variants&&pr.variants[0])?money2(pr.variants[0].priceCents):'';
@@ -4050,7 +4050,7 @@ function stRenderInventory(body){
   ST.products.forEach(function(pr){
     (pr.variants||[]).forEach(function(v,vi){
       var row=document.createElement('div');
-      row.style.cssText='display:flex;align-items:center;gap:12px;border:1px solid #b9bdd1;background:#fff;padding:8px 12px;margin-top:8px;';
+      row.style.cssText='display:flex;align-items:center;gap:12px;border:1px solid #b9bdd1;background:#fff;box-shadow:2px 2px 0 #9aa;padding:12px 14px;margin-top:10px;';
       var img=(pr.images&&pr.images[0])||'';
       var stockEl=document.createElement('span');
       stockEl.style.cssText='font-weight:700;min-width:34px;text-align:center;font-size:16px;';
@@ -4091,7 +4091,7 @@ function stRenderOrders(body){
   var list=document.createElement('div'); list.style.marginTop='4px';
   ST.orders.forEach(function(o){
     var row=document.createElement('div');
-    row.style.cssText='display:flex;gap:10px;align-items:center;border:1px solid #b9bdd1;background:#fff;padding:10px;margin-top:8px;cursor:pointer;flex-wrap:wrap;';
+    row.style.cssText='display:flex;gap:12px;align-items:center;border:1px solid #b9bdd1;background:#fff;box-shadow:2px 2px 0 #9aa;padding:12px 14px;margin-top:10px;cursor:pointer;flex-wrap:wrap;';
     var badge = o.status==='fulfilled' ? '#1e7a3c' : (o.status==='delivered' ? '#5b2d8e' : (o.status==='refunded' ? '#8a2626' : '#2b3a8f'));
     row.innerHTML =
       '<strong>'+(o.name||'')+'</strong>'+
