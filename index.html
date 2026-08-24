@@ -3831,6 +3831,25 @@ function stCfgPrompt(){
   renderStorePage();
 }
 function money2(cents){ return '$' + ((cents||0)/100).toFixed(2); }
+var ST_CARRIERS = {
+  'TNT':     'https://www.tnt.com/express/en_au/site/tracking.html?searchType=con&cons={N}',
+  'FedEx':   'https://www.fedex.com/fedextrack/?trknbr={N}',
+  'AusPost': 'https://auspost.com.au/mypost/track/#/details/{N}',
+  'DHL':     'https://www.dhl.com/au-en/home/tracking.html?tracking-id={N}'
+};
+function stResizeImage(file, maxDim, cb){
+  var img=new Image();
+  img.onload=function(){
+    var w=img.width, h=img.height;
+    if(w<=maxDim && h<=maxDim && file.size < 400*1024){ cb(file, (file.name.split('.').pop()||'jpg')); return; }
+    var scale=Math.min(maxDim/w, maxDim/h, 1);
+    var c=document.createElement('canvas'); c.width=Math.round(w*scale); c.height=Math.round(h*scale);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    c.toBlob(function(b){ cb(b||file, 'jpg'); }, 'image/jpeg', 0.85);
+  };
+  img.onerror=function(){ cb(file, (file.name.split('.').pop()||'jpg')); };
+  img.src=URL.createObjectURL(file);
+}
 function slugify(t){ return String(t||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || ('product-'+Date.now()); }
 
 function stLoad(cb){
@@ -3960,11 +3979,15 @@ function stEditProduct(pr){
     var chain=Promise.resolve();
     files.forEach(function(f){
       chain=chain.then(function(){
-        var ext=(f.name.split('.').pop()||'png').toLowerCase();
-        var path='pit/products/'+handle+'/'+Date.now()+'-'+Math.floor(Math.random()*1e4)+'.'+ext;
-        return firebase.storage().ref(path).put(f).then(function(){
-          pr.images=pr.images||[];
-          pr.images.push('https://storage.googleapis.com/docket-6159b.firebasestorage.app/'+path);
+        return new Promise(function(resolve,reject){
+          stResizeImage(f, 1400, function(blob, ext){
+            var path='pit/products/'+handle+'/'+Date.now()+'-'+Math.floor(Math.random()*1e4)+'.'+ext;
+            firebase.storage().ref(path).put(blob, { cacheControl:'public,max-age=31536000,immutable' }).then(function(){
+              pr.images=pr.images||[];
+              pr.images.push('https://storage.googleapis.com/docket-6159b.firebasestorage.app/'+path);
+              resolve();
+            }).catch(reject);
+          });
         });
       });
     });
@@ -4044,22 +4067,31 @@ function stOrderDetail(o){
   var msg=document.createElement('div'); msg.style.cssText='font-size:13px;margin-top:8px;';
 
   if(o.status==='paid'){
-    var f=document.createElement('button'); f.className='gmc-red'; f.textContent='Fulfil\u2026';
+    var fWrap=document.createElement('div');
+    fWrap.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+    var trIn=document.createElement('input'); trIn.type='text'; trIn.placeholder='Tracking number';
+    trIn.style.cssText='padding:6px;border:1px solid #b9bdd1;min-width:220px;';
+    var coSel=document.createElement('select'); coSel.style.cssText='padding:6px;border:1px solid #b9bdd1;';
+    Object.keys(ST_CARRIERS).forEach(function(k){ var o2=document.createElement('option'); o2.value=k; o2.textContent=k; coSel.appendChild(o2); });
+    var f=document.createElement('button'); f.className='gmc-red'; f.textContent='Fulfil';
     f.onclick=function(){
       var cfg=stCfg();
       if(!cfg.api||!cfg.key){ msg.textContent='Set server URL + key first (\u2699).'; return; }
-      var tr=prompt('Tracking number for '+o.name+':'); if(!tr) return;
-      var co=prompt('Carrier:','TNT')||'TNT';
-      msg.textContent='Fulfilling\u2026';
+      var tr=trIn.value.trim();
+      if(!tr){ msg.textContent='Enter a tracking number.'; return; }
+      var co=coSel.value;
+      var turl=ST_CARRIERS[co].replace('{N}', encodeURIComponent(tr));
+      f.disabled=true; msg.textContent='Fulfilling\u2026';
       fetch(cfg.api+'/api/pit-fulfill',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ key:cfg.key, orderName:o.name, tracking:tr, company:co })
+        body: JSON.stringify({ key:cfg.key, orderName:o.name, tracking:tr, company:co, trackingUrl:turl })
       }).then(function(r){ return r.json(); }).then(function(res){
-        if(res&&res.fulfilled){ renderStorePage(); ST.view='orders'; }
-        else msg.textContent='Failed: '+((res&&res.error)||'unknown');
-      }).catch(function(e){ msg.textContent='Failed: '+(e.message||e); });
+        if(res&&res.fulfilled){ ST.view='orders'; renderStorePage(); }
+        else { f.disabled=false; msg.textContent='Failed: '+((res&&res.error)||'unknown'); }
+      }).catch(function(e){ f.disabled=false; msg.textContent='Failed: '+(e.message||e); });
     };
-    row.appendChild(f);
+    fWrap.appendChild(trIn); fWrap.appendChild(coSel); fWrap.appendChild(f);
+    row.appendChild(fWrap);
 
     var rf=document.createElement('button'); rf.className='act'; rf.textContent='Mark refunded';
     rf.onclick=function(){
