@@ -1167,6 +1167,7 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
 /* ═══ config ══════════════════════════════════════════════
    Paste your Firebase web config below. Every value here is
@@ -3169,7 +3170,7 @@ function render(){
   // per-business tabs
   var TABS = {
     gmc:[['tasks','Tasks'],['projects','Projects'],['notifs','Alerts'],['hitlist','Hit List'+((S.hitList&&S.hitList.length)?' ('+S.hitList.length+')':'')],['contacts','Contacts'+((S.contacts&&S.contacts.length)?' ('+S.contacts.length+')':'')],['calendar','Calendar'],['audit','Audit']],
-    pit:[['tasks','Tasks'],['grid','Grid']]
+    pit:[['tasks','Tasks'],['grid','Grid'],['store','Store']]
   };
   var tabs = TABS[hub] || null;
   if(tabs){
@@ -3201,6 +3202,7 @@ function render(){
   if(S.page==='projects'){ document.getElementById('headcount').textContent=''; renderProjects(); return; }
   if(S.page==='notifs'){ document.getElementById('headcount').textContent=''; renderNotifs(); return; }
   if(S.page==='grid'){ document.getElementById('headcount').textContent=''; renderGridPage(); return; }
+  if(S.page==='store'){ document.getElementById('headcount').textContent=''; renderStorePage(); return; }
   if(S.page==='hitlist'){ document.getElementById('headcount').textContent=''; renderHitList(); return; }
   if(S.page==='contacts'){ document.getElementById('headcount').textContent=''; renderContacts(); return; }
   if(S.page==='calendar'){ document.getElementById('headcount').textContent=''; renderCalendar(); return; }
@@ -3808,6 +3810,267 @@ function renderGridPage(){
   var open=document.createElement('button'); open.className='gmc-red'; open.style.marginTop='6px'; open.textContent='Open planner';
   open.onclick=function(){ openIG(); };
   w.appendChild(open);
+  sheet.appendChild(w);
+}
+
+/* ═══ PIT Store — products + orders (Firestore collections) ═══ */
+var ST = { view:'products', products:[], orders:[], busy:false };
+
+function stCfg(){
+  var c = {};
+  try { c = JSON.parse(localStorage.getItem('pit_store_cfg') || '{}'); } catch(e){}
+  return { api: c.api || '', key: c.key || '' };
+}
+function stCfgPrompt(){
+  var cur = stCfg();
+  var api = prompt('PIT server base URL (no trailing slash):', cur.api || 'https://logistics-pit-staging-staging.up.railway.app');
+  if(api === null) return;
+  var key = prompt('Fulfil key:', cur.key || '');
+  if(key === null) return;
+  localStorage.setItem('pit_store_cfg', JSON.stringify({ api: api.replace(/\/+$/,''), key: key }));
+  renderStorePage();
+}
+function money2(cents){ return '$' + ((cents||0)/100).toFixed(2); }
+function slugify(t){ return String(t||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || ('product-'+Date.now()); }
+
+function stLoad(cb){
+  if(!isOwner() || !fbConfigured()){ cb('Owner sign-in required'); return; }
+  Promise.all([
+    fbDb.collection('pit_products').get(),
+    fbDb.collection('pit_orders').orderBy('order_number','desc').limit(50).get()
+  ]).then(function(res){
+    ST.products = res[0].docs.map(function(d){ return d.data(); });
+    ST.orders = res[1].docs.map(function(d){ return d.data(); });
+    cb(null);
+  }).catch(function(e){ cb(e.message || 'load failed'); });
+}
+
+function renderStorePage(){
+  sheet.innerHTML='';
+  var w=document.createElement('div'); w.className='notif-wrap';
+  var head=document.createElement('div');
+  head.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+  head.innerHTML='<h2 style="margin:0;">PIT Store</h2>';
+  var bP=document.createElement('button'); bP.className='act'; bP.textContent='Products';
+  var bO=document.createElement('button'); bO.className='act'; bO.textContent='Orders';
+  var bG=document.createElement('button'); bG.className='act'; bG.textContent='\u2699';
+  bP.onclick=function(){ ST.view='products'; renderStorePage(); };
+  bO.onclick=function(){ ST.view='orders'; renderStorePage(); };
+  bG.onclick=stCfgPrompt;
+  if(ST.view==='products') bP.setAttribute('aria-current','page');
+  if(ST.view==='orders') bO.setAttribute('aria-current','page');
+  head.appendChild(bP); head.appendChild(bO); head.appendChild(bG);
+  w.appendChild(head);
+
+  var body=document.createElement('div'); body.id='stBody'; body.style.marginTop='12px';
+  body.textContent='Loading\u2026';
+  w.appendChild(body);
+  sheet.appendChild(w);
+
+  stLoad(function(err){
+    if(err){ body.textContent='Store load failed: '+err; return; }
+    if(ST.view==='products') stRenderProducts(body); else stRenderOrders(body);
+  });
+}
+
+/* ── products ── */
+function stRenderProducts(body){
+  body.innerHTML='';
+  var add=document.createElement('button'); add.className='gmc-red'; add.textContent='+ New product';
+  add.onclick=function(){ stEditProduct(null); };
+  body.appendChild(add);
+
+  var grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-top:12px;';
+  ST.products.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
+  ST.products.forEach(function(pr){
+    var card=document.createElement('div');
+    card.style.cssText='border:1px solid #b9bdd1;background:#fff;box-shadow:2px 2px 0 #9aa;padding:10px;cursor:pointer;';
+    var img=(pr.images&&pr.images[0])||'';
+    var stock=(pr.variants||[]).reduce(function(n,v){ return n+(v.stock||0); },0);
+    var price=(pr.variants&&pr.variants[0])?money2(pr.variants[0].priceCents):'';
+    card.innerHTML =
+      (img?'<img src="'+img+'" style="width:100%;height:150px;object-fit:cover;display:block;margin-bottom:8px;">':'')+
+      '<div style="font-weight:700;">'+(pr.title||'(untitled)')+'</div>'+
+      '<div style="font-size:13px;margin-top:2px;">'+price+' \u00b7 stock '+stock+'</div>'+
+      '<div style="margin-top:6px;"><span style="font-size:11px;letter-spacing:.08em;padding:2px 8px;background:'+(pr.active?'#1e7a3c':'#8a5a00')+';color:#fff;">'+(pr.active?'ACTIVE':'DRAFT')+'</span></div>';
+    card.onclick=function(){ stEditProduct(pr); };
+    grid.appendChild(card);
+  });
+  body.appendChild(grid);
+}
+
+function stEditProduct(pr){
+  var isNew = !pr;
+  pr = pr || { handle:'', title:'', descriptionHtml:'', active:false, images:[],
+               variants:[{ id:String(Date.now()), title:'OSFA', sku:'', priceCents:0, stock:0 }] };
+  var v = pr.variants[0];
+
+  sheet.innerHTML='';
+  var w=document.createElement('div'); w.className='notif-wrap';
+  w.innerHTML='<h2>'+(isNew?'New product':'Edit \u2014 '+(pr.title||''))+'</h2>';
+
+  function field(label, value, type){
+    var l=document.createElement('label'); l.style.cssText='display:block;margin-top:10px;font-size:13px;font-weight:700;';
+    l.textContent=label;
+    var i=document.createElement(type==='area'?'textarea':'input');
+    if(type!=='area') i.type='text';
+    i.value=value||''; i.style.cssText='display:block;width:100%;max-width:520px;margin-top:4px;padding:6px;border:1px solid #b9bdd1;box-sizing:border-box;'+(type==='area'?'min-height:90px;':'');
+    l.appendChild(i); w.appendChild(l);
+    return i;
+  }
+  var fTitle=field('Title', pr.title);
+  var fDesc=field('Description (HTML ok)', pr.descriptionHtml, 'area');
+  var fVar=field('Variant label', v.title);
+  var fSku=field('SKU', v.sku);
+  var fPrice=field('Price (AUD, e.g. 69.95)', v.priceCents?(v.priceCents/100).toFixed(2):'');
+  var fStock=field('Stock', String(v.stock||0));
+
+  var tog=document.createElement('label'); tog.style.cssText='display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:700;';
+  var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!pr.active;
+  tog.appendChild(cb); tog.appendChild(document.createTextNode('Active (visible on storefront)'));
+  w.appendChild(tog);
+
+  var imgsWrap=document.createElement('div'); imgsWrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;';
+  function drawImgs(){
+    imgsWrap.innerHTML='';
+    (pr.images||[]).forEach(function(u,i){
+      var d=document.createElement('div'); d.style.cssText='position:relative;';
+      d.innerHTML='<img src="'+u+'" style="width:84px;height:84px;object-fit:cover;border:1px solid #b9bdd1;display:block;">';
+      var x=document.createElement('button'); x.textContent='\u00d7';
+      x.style.cssText='position:absolute;top:-6px;right:-6px;width:20px;height:20px;line-height:1;padding:0;';
+      x.onclick=function(){ pr.images.splice(i,1); drawImgs(); };
+      d.appendChild(x); imgsWrap.appendChild(d);
+    });
+  }
+  drawImgs();
+  w.appendChild(imgsWrap);
+
+  var up=document.createElement('input'); up.type='file'; up.accept='image/*'; up.multiple=true; up.style.marginTop='8px';
+  var upMsg=document.createElement('div'); upMsg.style.cssText='font-size:12px;margin-top:4px;';
+  up.onchange=function(){
+    var handle = pr.handle || slugify(fTitle.value);
+    var files=Array.prototype.slice.call(up.files||[]);
+    if(!files.length) return;
+    upMsg.textContent='Uploading\u2026';
+    var chain=Promise.resolve();
+    files.forEach(function(f){
+      chain=chain.then(function(){
+        var ext=(f.name.split('.').pop()||'png').toLowerCase();
+        var path='pit/products/'+handle+'/'+Date.now()+'-'+Math.floor(Math.random()*1e4)+'.'+ext;
+        return firebase.storage().ref(path).put(f).then(function(){
+          pr.images=pr.images||[];
+          pr.images.push('https://storage.googleapis.com/docket-6159b.firebasestorage.app/'+path);
+        });
+      });
+    });
+    chain.then(function(){ upMsg.textContent='Uploaded.'; up.value=''; drawImgs(); })
+         .catch(function(e){ upMsg.textContent='Upload failed: '+(e.message||e); });
+  };
+  w.appendChild(up); w.appendChild(upMsg);
+
+  var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-top:16px;';
+  var save=document.createElement('button'); save.className='gmc-red'; save.textContent='Save';
+  var back=document.createElement('button'); back.className='act'; back.textContent='Back';
+  var msg=document.createElement('div'); msg.style.cssText='font-size:13px;margin-top:8px;';
+  back.onclick=function(){ renderStorePage(); };
+  save.onclick=function(){
+    var title=fTitle.value.trim();
+    if(!title){ msg.textContent='Title required.'; return; }
+    var priceC=Math.round(parseFloat(fPrice.value||'0')*100);
+    if(!(priceC>0)){ msg.textContent='Price must be > 0.'; return; }
+    var stock=parseInt(fStock.value,10); if(!(stock>=0)) stock=0;
+    var handle=pr.handle||slugify(title);
+    var doc={
+      handle:handle, title:title, descriptionHtml:fDesc.value,
+      active:cb.checked, images:pr.images||[],
+      variants:[{ id:v.id, title:fVar.value.trim()||'OSFA', sku:fSku.value.trim(), priceCents:priceC, stock:stock }],
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if(isNew) doc.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    if(pr.migratedFromShopify) doc.migratedFromShopify = pr.migratedFromShopify;
+    msg.textContent='Saving\u2026';
+    fbDb.collection('pit_products').doc(handle).set(doc,{merge:true})
+      .then(function(){ renderStorePage(); })
+      .catch(function(e){ msg.textContent='Save failed: '+(e.message||e); });
+  };
+  row.appendChild(save); row.appendChild(back);
+  w.appendChild(row); w.appendChild(msg);
+  sheet.appendChild(w);
+}
+
+/* ── orders ── */
+function stRenderOrders(body){
+  body.innerHTML='';
+  if(!ST.orders.length){ body.textContent='No orders yet.'; return; }
+  var list=document.createElement('div'); list.style.marginTop='4px';
+  ST.orders.forEach(function(o){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;gap:10px;align-items:center;border:1px solid #b9bdd1;background:#fff;padding:10px;margin-top:8px;cursor:pointer;flex-wrap:wrap;';
+    var badge = o.status==='fulfilled' ? '#1e7a3c' : (o.status==='refunded' ? '#8a2626' : '#2b3a8f');
+    row.innerHTML =
+      '<strong>'+(o.name||'')+'</strong>'+
+      '<span>'+((o.shipping_address&&o.shipping_address.name)||o.email||'')+'</span>'+
+      '<span>$'+(o.total_price||'')+'</span>'+
+      '<span style="margin-left:auto;font-size:11px;letter-spacing:.08em;padding:2px 8px;background:'+badge+';color:#fff;">'+(o.status||'').toUpperCase()+'</span>';
+    row.onclick=function(){ stOrderDetail(o); };
+    list.appendChild(row);
+  });
+  body.appendChild(list);
+}
+
+function stOrderDetail(o){
+  sheet.innerHTML='';
+  var w=document.createElement('div'); w.className='notif-wrap';
+  var a=o.shipping_address||{};
+  var items=(o.line_items||[]).map(function(li){
+    return '<div>'+li.title+(li.variant_title?' \u2014 '+li.variant_title:'')+' \u00d7'+li.quantity+' \u00b7 $'+li.price+'</div>';
+  }).join('');
+  var shipLine=(o.shipping_lines&&o.shipping_lines[0])?('<div>'+o.shipping_lines[0].title+' \u00b7 $'+o.shipping_lines[0].price+'</div>'):'';
+  w.innerHTML =
+    '<h2>'+(o.name||'')+' \u2014 '+(o.status||'').toUpperCase()+'</h2>'+
+    '<div style="margin-top:8px;">'+items+shipLine+'<div style="font-weight:700;margin-top:4px;">Total $'+(o.total_price||'')+' '+(o.currency||'')+'</div></div>'+
+    '<div style="margin-top:12px;"><strong>Deliver to</strong><br>'+
+      [a.name,a.address1,a.address2,[a.city,a.province_code,a.zip].filter(Boolean).join(' '),a.country,a.phone].filter(Boolean).join('<br>')+
+    '</div>'+
+    '<div style="margin-top:8px;font-size:12px;">'+(o.email||'')+' \u00b7 '+(o.stripeIntentId||'')+'</div>'+
+    (o.fulfillment?('<div style="margin-top:8px;"><strong>Tracking</strong>: '+(o.fulfillment.tracking_number||'')+' ('+(o.fulfillment.tracking_company||'')+')</div>'):'');
+
+  var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;';
+  var msg=document.createElement('div'); msg.style.cssText='font-size:13px;margin-top:8px;';
+
+  if(o.status==='paid'){
+    var f=document.createElement('button'); f.className='gmc-red'; f.textContent='Fulfil\u2026';
+    f.onclick=function(){
+      var cfg=stCfg();
+      if(!cfg.api||!cfg.key){ msg.textContent='Set server URL + key first (\u2699).'; return; }
+      var tr=prompt('Tracking number for '+o.name+':'); if(!tr) return;
+      var co=prompt('Carrier:','TNT')||'TNT';
+      msg.textContent='Fulfilling\u2026';
+      fetch(cfg.api+'/api/pit-fulfill',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ key:cfg.key, orderName:o.name, tracking:tr, company:co })
+      }).then(function(r){ return r.json(); }).then(function(res){
+        if(res&&res.fulfilled){ renderStorePage(); ST.view='orders'; }
+        else msg.textContent='Failed: '+((res&&res.error)||'unknown');
+      }).catch(function(e){ msg.textContent='Failed: '+(e.message||e); });
+    };
+    row.appendChild(f);
+
+    var rf=document.createElement('button'); rf.className='act'; rf.textContent='Mark refunded';
+    rf.onclick=function(){
+      if(!confirm('Mark '+o.name+' refunded? (Refund the money in Stripe separately.)')) return;
+      fbDb.collection('pit_orders').doc(o.stripeIntentId).update({ status:'refunded' })
+        .then(function(){ ST.view='orders'; renderStorePage(); })
+        .catch(function(e){ msg.textContent='Failed: '+(e.message||e); });
+    };
+    row.appendChild(rf);
+  }
+
+  var back=document.createElement('button'); back.className='act'; back.textContent='Back';
+  back.onclick=function(){ ST.view='orders'; renderStorePage(); };
+  row.appendChild(back);
+  w.appendChild(row); w.appendChild(msg);
   sheet.appendChild(w);
 }
 
