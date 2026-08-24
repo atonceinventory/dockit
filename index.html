@@ -3835,7 +3835,8 @@ var ST_CARRIERS = {
   'TNT':     'https://www.tnt.com/express/en_au/site/tracking.html?searchType=con&cons={N}',
   'FedEx':   'https://www.fedex.com/fedextrack/?trknbr={N}',
   'AusPost': 'https://auspost.com.au/mypost/track/#/details/{N}',
-  'DHL':     'https://www.dhl.com/au-en/home/tracking.html?tracking-id={N}'
+  'DHL':     'https://www.dhl.com/au-en/home/tracking.html?tracking-id={N}',
+  'Hand Deliver': ''
 };
 function stResizeImage(file, maxDim, cb){
   var img=new Image();
@@ -3873,13 +3874,16 @@ function renderStorePage(){
   head.innerHTML='<h2 style="margin:0;">PIT Store</h2>';
   var bP=document.createElement('button'); bP.className='act'; bP.textContent='Products';
   var bO=document.createElement('button'); bO.className='act'; bO.textContent='Orders';
+  var bI=document.createElement('button'); bI.className='act'; bI.textContent='Inventory';
   var bG=document.createElement('button'); bG.className='act'; bG.textContent='\u2699';
   bP.onclick=function(){ ST.view='products'; renderStorePage(); };
   bO.onclick=function(){ ST.view='orders'; renderStorePage(); };
+  bI.onclick=function(){ ST.view='inventory'; renderStorePage(); };
   bG.onclick=stCfgPrompt;
   if(ST.view==='products') bP.setAttribute('aria-current','page');
   if(ST.view==='orders') bO.setAttribute('aria-current','page');
-  head.appendChild(bP); head.appendChild(bO); head.appendChild(bG);
+  if(ST.view==='inventory') bI.setAttribute('aria-current','page');
+  head.appendChild(bP); head.appendChild(bO); head.appendChild(bI); head.appendChild(bG);
   w.appendChild(head);
 
   var body=document.createElement('div'); body.id='stBody'; body.style.marginTop='12px';
@@ -3889,7 +3893,7 @@ function renderStorePage(){
 
   stLoad(function(err){
     if(err){ body.textContent='Store load failed: '+err; return; }
-    if(ST.view==='products') stRenderProducts(body); else stRenderOrders(body);
+    if(ST.view==='products') stRenderProducts(body); else if(ST.view==='inventory') stRenderInventory(body); else stRenderOrders(body);
   });
 }
 
@@ -4026,6 +4030,48 @@ function stEditProduct(pr){
   sheet.appendChild(w);
 }
 
+/* ── inventory ── */
+function stRenderInventory(body){
+  body.innerHTML='';
+  var list=document.createElement('div');
+  ST.products.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
+  ST.products.forEach(function(pr){
+    (pr.variants||[]).forEach(function(v,vi){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:12px;border:1px solid #b9bdd1;background:#fff;padding:8px 12px;margin-top:8px;';
+      var img=(pr.images&&pr.images[0])||'';
+      var stockEl=document.createElement('span');
+      stockEl.style.cssText='font-weight:700;min-width:34px;text-align:center;font-size:16px;';
+      stockEl.textContent=String(v.stock||0);
+      function adjBtn(delta){
+        var b2=document.createElement('button'); b2.className='act';
+        b2.textContent=delta>0?'+':'\u2212';
+        b2.style.cssText='min-width:36px;font-size:16px;font-weight:700;';
+        b2.onclick=function(){
+          var cur=parseInt(stockEl.textContent,10)||0;
+          var next=Math.max(0,cur+delta);
+          if(next===cur) return;
+          b2.disabled=true;
+          var newVariants=pr.variants.map(function(x,xi){ return xi===vi ? Object.assign({},x,{stock:next}) : x; });
+          fbDb.collection('pit_products').doc(pr.handle).update({ variants:newVariants, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+            .then(function(){ pr.variants=newVariants; v=newVariants[vi]; stockEl.textContent=String(next); b2.disabled=false; })
+            .catch(function(e){ b2.disabled=false; alert('Update failed: '+(e.message||e)); });
+        };
+        return b2;
+      }
+      row.appendChild(img?(function(){var im=document.createElement('img');im.src=img;im.style.cssText='width:40px;height:40px;object-fit:cover;border:1px solid #d5d8e6;';return im;})():document.createElement('span'));
+      var nm=document.createElement('span'); nm.style.cssText='flex:1;font-weight:700;';
+      nm.textContent=(pr.title||'')+((v.title&&v.title!=='Default')?' \u2014 '+v.title:'');
+      row.appendChild(nm);
+      row.appendChild(adjBtn(-1));
+      row.appendChild(stockEl);
+      row.appendChild(adjBtn(1));
+      list.appendChild(row);
+    });
+  });
+  body.appendChild(list);
+}
+
 /* ── orders ── */
 function stRenderOrders(body){
   body.innerHTML='';
@@ -4034,7 +4080,7 @@ function stRenderOrders(body){
   ST.orders.forEach(function(o){
     var row=document.createElement('div');
     row.style.cssText='display:flex;gap:10px;align-items:center;border:1px solid #b9bdd1;background:#fff;padding:10px;margin-top:8px;cursor:pointer;flex-wrap:wrap;';
-    var badge = o.status==='fulfilled' ? '#1e7a3c' : (o.status==='refunded' ? '#8a2626' : '#2b3a8f');
+    var badge = o.status==='fulfilled' ? '#1e7a3c' : (o.status==='delivered' ? '#5b2d8e' : (o.status==='refunded' ? '#8a2626' : '#2b3a8f'));
     row.innerHTML =
       '<strong>'+(o.name||'')+'</strong>'+
       '<span>'+((o.shipping_address&&o.shipping_address.name)||o.email||'')+'</span>'+
@@ -4077,10 +4123,12 @@ function stOrderDetail(o){
     f.onclick=function(){
       var cfg=stCfg();
       if(!cfg.api||!cfg.key){ msg.textContent='Set server URL + key first (\u2699).'; return; }
-      var tr=trIn.value.trim();
-      if(!tr){ msg.textContent='Enter a tracking number.'; return; }
       var co=coSel.value;
-      var turl=ST_CARRIERS[co].replace('{N}', encodeURIComponent(tr));
+      var hand=(co==='Hand Deliver');
+      var tr=trIn.value.trim();
+      if(!tr && !hand){ msg.textContent='Enter a tracking number.'; return; }
+      var turl=(!hand && ST_CARRIERS[co]) ? ST_CARRIERS[co].replace('{N}', encodeURIComponent(tr)) : '';
+      if(hand) co='Hand Delivery';
       f.disabled=true; msg.textContent='Fulfilling\u2026';
       fetch(cfg.api+'/api/pit-fulfill',{
         method:'POST', headers:{'Content-Type':'application/json'},
@@ -4103,6 +4151,23 @@ function stOrderDetail(o){
     row.appendChild(rf);
   }
 
+  if(o.status==='fulfilled'){
+    var dv=document.createElement('button'); dv.className='gmc-red'; dv.textContent='Mark delivered';
+    dv.onclick=function(){
+      var cfg=stCfg();
+      if(!cfg.api||!cfg.key){ msg.textContent='Set server URL + key first (\u2699).'; return; }
+      if(!confirm('Mark '+o.name+' delivered and email the customer?')) return;
+      dv.disabled=true; msg.textContent='Sending\u2026';
+      fetch(cfg.api+'/api/pit-deliver',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ key:cfg.key, orderName:o.name })
+      }).then(function(r){ return r.json(); }).then(function(res){
+        if(res&&res.delivered){ ST.view='orders'; renderStorePage(); }
+        else { dv.disabled=false; msg.textContent='Failed: '+((res&&res.error)||'unknown'); }
+      }).catch(function(e){ dv.disabled=false; msg.textContent='Failed: '+(e.message||e); });
+    };
+    row.appendChild(dv);
+  }
   var back=document.createElement('button'); back.className='act'; back.textContent='Back';
   back.onclick=function(){ ST.view='orders'; renderStorePage(); };
   row.appendChild(back);
