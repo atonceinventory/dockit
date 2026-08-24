@@ -3170,14 +3170,14 @@ function render(){
   // per-business tabs
   var TABS = {
     gmc:[['tasks','Tasks'],['projects','Projects'],['notifs','Alerts'],['hitlist','Hit List'+((S.hitList&&S.hitList.length)?' ('+S.hitList.length+')':'')],['contacts','Contacts'+((S.contacts&&S.contacts.length)?' ('+S.contacts.length+')':'')],['calendar','Calendar'],['audit','Audit']],
-    pit:[['tasks','Tasks'],['grid','Grid'],['store','Store']]
+    pit:[['tasks','Tasks'],['grid','Grid'],['store','Store'+(ST_UNFUL?' <span style="background:#a32222;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;">'+ST_UNFUL+'</span>':'')]]
   };
   var tabs = TABS[hub] || null;
   if(tabs){
     pagesBar.style.display='';
     pagesBar.innerHTML='';
     tabs.forEach(function(tp){
-      var b=document.createElement('button'); b.dataset.page=tp[0]; b.textContent=tp[1];
+      var b=document.createElement('button'); b.dataset.page=tp[0]; b.innerHTML=tp[1];
       if(S.page===tp[0]) b.setAttribute('aria-current','page');
       pagesBar.appendChild(b);
     });
@@ -3815,6 +3815,17 @@ function renderGridPage(){
 
 /* ═══ PIT Store — products + orders (Firestore collections) ═══ */
 var ST = { view:'products', products:[], orders:[], busy:false };
+var ST_UNFUL = 0;
+function stCountUnfulfilled(){
+  try{
+    if(!fbConfigured() || !fbUser || !isOwner()) return;
+    fbDb.collection('pit_orders').where('status','==','paid').get().then(function(snap){
+      if(snap.size !== ST_UNFUL){ ST_UNFUL = snap.size; try{ render(); }catch(e){} }
+    }).catch(function(){});
+  }catch(e){}
+}
+setTimeout(stCountUnfulfilled, 3000);
+setInterval(stCountUnfulfilled, 300000);
 
 function stCfg(){
   var c = {};
@@ -3861,6 +3872,7 @@ function stLoad(cb){
   ]).then(function(res){
     ST.products = res[0].docs.map(function(d){ return d.data(); });
     ST.orders = res[1].docs.map(function(d){ return d.data(); });
+    ST_UNFUL = ST.orders.filter(function(o){ return o.status==='paid'; }).length;
     cb(null);
   }).catch(function(e){ cb(e.message || 'load failed'); });
 }
