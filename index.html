@@ -3848,6 +3848,7 @@ function stLoad(cb){
 function renderStorePage(){
   sheet.innerHTML='';
   var w=document.createElement('div'); w.className='notif-wrap';
+  w.style.cssText='max-width:1100px;margin:0 auto;';
   var head=document.createElement('div');
   head.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
   head.innerHTML='<h2 style="margin:0;">PIT Store</h2>';
@@ -3876,24 +3877,26 @@ function renderStorePage(){
 /* ── products ── */
 function stRenderProducts(body){
   body.innerHTML='';
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:flex-end;';
   var add=document.createElement('button'); add.className='gmc-red'; add.textContent='+ New product';
   add.onclick=function(){ stEditProduct(null); };
-  body.appendChild(add);
+  bar.appendChild(add); body.appendChild(bar);
 
   var grid=document.createElement('div');
-  grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-top:12px;';
+  grid.style.cssText='margin-top:12px;';
   ST.products.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
   ST.products.forEach(function(pr){
     var card=document.createElement('div');
-    card.style.cssText='border:1px solid #b9bdd1;background:#fff;box-shadow:2px 2px 0 #9aa;padding:10px;cursor:pointer;';
+    card.style.cssText='display:flex;align-items:center;gap:12px;border:1px solid #b9bdd1;background:#fff;padding:8px 12px;margin-top:8px;cursor:pointer;';
     var img=(pr.images&&pr.images[0])||'';
     var stock=(pr.variants||[]).reduce(function(n,v){ return n+(v.stock||0); },0);
     var price=(pr.variants&&pr.variants[0])?money2(pr.variants[0].priceCents):'';
     card.innerHTML =
-      (img?'<img src="'+img+'" style="width:100%;height:150px;object-fit:cover;display:block;margin-bottom:8px;">':'')+
-      '<div style="font-weight:700;">'+(pr.title||'(untitled)')+'</div>'+
-      '<div style="font-size:13px;margin-top:2px;">'+price+' \u00b7 stock '+stock+'</div>'+
-      '<div style="margin-top:6px;"><span style="font-size:11px;letter-spacing:.08em;padding:2px 8px;background:'+(pr.active?'#1e7a3c':'#8a5a00')+';color:#fff;">'+(pr.active?'ACTIVE':'DRAFT')+'</span></div>';
+      (img?'<img src="'+img+'" style="width:48px;height:48px;object-fit:cover;display:block;border:1px solid #d5d8e6;">':'<span style="width:48px;height:48px;display:inline-block;background:#e4e6f0;"></span>')+
+      '<span style="font-weight:700;flex:1;">'+(pr.title||'(untitled)')+'</span>'+
+      '<span style="font-size:13px;">'+price+'</span>'+
+      '<span style="font-size:13px;">stock '+stock+'</span>'+
+      '<span style="font-size:11px;letter-spacing:.08em;padding:2px 8px;background:'+(pr.active?'#1e7a3c':'#8a5a00')+';color:#fff;">'+(pr.active?'ACTIVE':'DRAFT')+'</span>';
     card.onclick=function(){ stEditProduct(pr); };
     grid.appendChild(card);
   });
@@ -3908,6 +3911,7 @@ function stEditProduct(pr){
 
   sheet.innerHTML='';
   var w=document.createElement('div'); w.className='notif-wrap';
+  w.style.cssText='max-width:620px;margin:0 auto;';
   w.innerHTML='<h2>'+(isNew?'New product':'Edit \u2014 '+(pr.title||''))+'</h2>';
 
   function field(label, value, type){
@@ -3915,7 +3919,7 @@ function stEditProduct(pr){
     l.textContent=label;
     var i=document.createElement(type==='area'?'textarea':'input');
     if(type!=='area') i.type='text';
-    i.value=value||''; i.style.cssText='display:block;width:100%;max-width:520px;margin-top:4px;padding:6px;border:1px solid #b9bdd1;box-sizing:border-box;'+(type==='area'?'min-height:90px;':'');
+    i.value=value||''; i.style.cssText='display:block;width:100%;margin-top:4px;padding:6px;border:1px solid #b9bdd1;box-sizing:border-box;'+(type==='area'?'min-height:90px;':'');
     l.appendChild(i); w.appendChild(l);
     return i;
   }
