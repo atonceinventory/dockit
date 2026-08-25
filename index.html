@@ -3888,17 +3888,20 @@ function renderStorePage(){
   var bO=document.createElement('button'); bO.className='act'; bO.textContent='Orders';
   var bI=document.createElement('button'); bI.className='act'; bI.textContent='Inventory';
   var bC=document.createElement('button'); bC.className='act'; bC.textContent='Customers';
+  var bF=document.createElement('button'); bF.className='act'; bF.textContent='Finance';
   var bG=document.createElement('button'); bG.className='act'; bG.textContent='\u2699';
   bP.onclick=function(){ ST.view='products'; renderStorePage(); };
   bO.onclick=function(){ ST.view='orders'; renderStorePage(); };
   bI.onclick=function(){ ST.view='inventory'; renderStorePage(); };
   bC.onclick=function(){ ST.view='customers'; renderStorePage(); };
+  bF.onclick=function(){ ST.view='finance'; renderStorePage(); };
   bG.onclick=stCfgPrompt;
   if(ST.view==='products') bP.setAttribute('aria-current','page');
   if(ST.view==='orders') bO.setAttribute('aria-current','page');
   if(ST.view==='inventory') bI.setAttribute('aria-current','page');
   if(ST.view==='customers') bC.setAttribute('aria-current','page');
-  head.appendChild(bP); head.appendChild(bO); head.appendChild(bI); head.appendChild(bC); head.appendChild(bG);
+  if(ST.view==='finance') bF.setAttribute('aria-current','page');
+  head.appendChild(bP); head.appendChild(bO); head.appendChild(bI); head.appendChild(bC); head.appendChild(bF); head.appendChild(bG);
   w.appendChild(head);
 
   var body=document.createElement('div'); body.id='stBody'; body.style.marginTop='12px';
@@ -3908,7 +3911,7 @@ function renderStorePage(){
 
   stLoad(function(err){
     if(err){ body.textContent='Store load failed: '+err; return; }
-    if(ST.view==='products') stRenderProducts(body); else if(ST.view==='inventory') stRenderInventory(body); else if(ST.view==='customers') stRenderCustomers(body); else stRenderOrders(body);
+    if(ST.view==='products') stRenderProducts(body); else if(ST.view==='inventory') stRenderInventory(body); else if(ST.view==='customers') stRenderCustomers(body); else if(ST.view==='finance') stRenderFinance(body); else stRenderOrders(body);
   });
 }
 
@@ -3987,6 +3990,7 @@ function stEditProduct(pr){
   var fVar=field('Variant label', v.title);
   var fSku=field('SKU', v.sku);
   var fPrice=field('Price (AUD, e.g. 69.95)', v.priceCents?(v.priceCents/100).toFixed(2):'');
+  var fCost=field('Cost per unit (AUD, what it costs you)', v.costCents?(v.costCents/100).toFixed(2):'');
   var fStock=field('Stock', String(v.stock||0));
 
   var tog=document.createElement('label'); tog.style.cssText='display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:700;';
@@ -4051,7 +4055,7 @@ function stEditProduct(pr){
     var doc={
       handle:handle, title:title, descriptionHtml:fDesc.value,
       active:cb.checked, images:pr.images||[],
-      variants:[{ id:v.id, title:fVar.value.trim()||'OSFA', sku:fSku.value.trim(), priceCents:priceC, stock:stock }],
+      variants:[{ id:v.id, title:fVar.value.trim()||'OSFA', sku:fSku.value.trim(), priceCents:priceC, costCents:Math.round(parseFloat(fCost.value||'0')*100)||0, stock:stock }],
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     if(isNew) doc.createdAt = firebase.firestore.FieldValue.serverTimestamp();
@@ -4064,6 +4068,64 @@ function stEditProduct(pr){
   row.appendChild(save); row.appendChild(back);
   w.appendChild(row); w.appendChild(msg);
   sheet.appendChild(w);
+}
+
+/* ── finance ── */
+function stRenderFinance(body){
+  body.innerHTML='Loading\u2026';
+  var costById={};
+  ST.products.forEach(function(pr){ (pr.variants||[]).forEach(function(v){ costById[String(v.id)]=v.costCents||0; }); });
+  fbDb.collection('pit_orders').get().then(function(snap){
+    var rows=[];
+    snap.docs.forEach(function(d){
+      var o=d.data();
+      if(o.status==='refunded') return;
+      var ts=(o.createdAt && o.createdAt.toDate) ? o.createdAt.toDate() : new Date();
+      var rev=parseFloat(o.total_price||'0')||0;
+      var shipIn=(o.shipping_cents!=null? o.shipping_cents/100 : parseFloat((o.shipping_lines&&o.shipping_lines[0]&&o.shipping_lines[0].price)||'0')||0);
+      var cogs=0;
+      (o.line_items||[]).forEach(function(li){ cogs += ((costById[String(li.variantId)]||0)/100)*(li.quantity||1); });
+      var shipOut=((o.fulfillment&&o.fulfillment.shipCostCents)||0)/100;
+      rows.push({ ts:ts, rev:rev, shipIn:shipIn, cogs:cogs, shipOut:shipOut, n:1 });
+    });
+    function agg(list){
+      var t={ n:0, rev:0, shipIn:0, cogs:0, shipOut:0 };
+      list.forEach(function(r){ t.n+=r.n; t.rev+=r.rev; t.shipIn+=r.shipIn; t.cogs+=r.cogs; t.shipOut+=r.shipOut; });
+      t.profit=t.rev-t.cogs-t.shipOut;
+      return t;
+    }
+    function fyLabel(dt){ var y=dt.getFullYear(); var start=(dt.getMonth()>=6)?y:y-1; return 'FY'+String(start%100).padStart(2,'0')+'/'+String((start+1)%100).padStart(2,'0'); }
+    function moLabel(dt){ return dt.toLocaleString('en-AU',{month:'short',year:'numeric'}); }
+    var byMo={}, byFy={};
+    rows.forEach(function(r){
+      var m=moLabel(r.ts), f=fyLabel(r.ts);
+      (byMo[m]=byMo[m]||[]).push(r);
+      (byFy[f]=byFy[f]||[]).push(r);
+    });
+    var all=agg(rows);
+    body.innerHTML='';
+    function money(x){ return '$'+x.toFixed(2); }
+    function summaryCard(title,t){
+      var c=document.createElement('div');
+      c.style.cssText='background:var(--surface-2,#fff);border:1px solid var(--line,#b9bdd1);border-left:4px solid var(--pit,#2b3a8f);box-shadow:2px 2px 0 #9aa;padding:14px;margin-top:10px;';
+      c.innerHTML='<div style="font-weight:700;margin-bottom:6px;">'+title+'</div>'+
+        '<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;">'+
+        '<span>'+t.n+' order'+(t.n===1?'':'s')+'</span>'+
+        '<span>Revenue <b>'+money(t.rev)+'</b></span>'+
+        '<span>Shipping in <b>'+money(t.shipIn)+'</b></span>'+
+        '<span>COGS <b>'+money(t.cogs)+'</b></span>'+
+        '<span>Shipping out <b>'+money(t.shipOut)+'</b></span>'+
+        '<span style="color:'+(t.profit>=0?'#1e7a3c':'#a32222')+';">Profit <b>'+money(t.profit)+'</b></span>'+
+        '</div>';
+      return c;
+    }
+    body.appendChild(summaryCard('All time', all));
+    var fyKeys=Object.keys(byFy).sort().reverse();
+    fyKeys.forEach(function(k){ body.appendChild(summaryCard(k, agg(byFy[k]))); });
+    var moKeys=Object.keys(byMo).sort(function(a,b){ return new Date('1 '+b)-new Date('1 '+a); });
+    moKeys.forEach(function(k){ body.appendChild(summaryCard(k, agg(byMo[k]))); });
+    if(!rows.length) body.textContent='No orders yet.';
+  }).catch(function(e){ body.textContent='Load failed: '+(e.message||e); });
 }
 
 /* ── customers ── */
@@ -4202,13 +4264,15 @@ function stOrderDetail(o){
       f.disabled=true; msg.textContent='Fulfilling\u2026';
       fetch(cfg.api+'/api/pit-fulfill',{
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ key:cfg.key, orderName:o.name, tracking:tr, company:co, trackingUrl:turl })
+        body: JSON.stringify({ key:cfg.key, orderName:o.name, tracking:tr, company:co, trackingUrl:turl, shipCostCents: Math.round(parseFloat(costIn.value||'0')*100)||0 })
       }).then(function(r){ return r.json(); }).then(function(res){
         if(res&&res.fulfilled){ ST.view='orders'; renderStorePage(); }
         else { f.disabled=false; msg.textContent='Failed: '+((res&&res.error)||'unknown'); }
       }).catch(function(e){ f.disabled=false; msg.textContent='Failed: '+(e.message||e); });
     };
-    fWrap.appendChild(trIn); fWrap.appendChild(coSel); fWrap.appendChild(f);
+    var costIn=document.createElement('input'); costIn.type='text'; costIn.placeholder='Ship cost $ (you paid)';
+    costIn.style.cssText='padding:6px;border:1px solid #b9bdd1;width:150px;';
+    fWrap.appendChild(trIn); fWrap.appendChild(coSel); fWrap.appendChild(costIn); fWrap.appendChild(f);
     row.appendChild(fWrap);
 
     var rf=document.createElement('button'); rf.className='act'; rf.textContent='Mark refunded';
