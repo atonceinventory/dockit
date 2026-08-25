@@ -3834,14 +3834,15 @@ function stCountUnfulfilled(){
 setTimeout(stCountUnfulfilled, 3000);
 setInterval(stCountUnfulfilled, 300000);
 
+var ST_DEFAULT_API = 'https://logistics-pit.com';
 function stCfg(){
   var c = {};
   try { c = JSON.parse(localStorage.getItem('pit_store_cfg') || '{}'); } catch(e){}
-  return { api: c.api || '', key: c.key || '' };
+  return { api: c.api || ST_DEFAULT_API, key: c.key || '' };
 }
 function stCfgPrompt(){
   var cur = stCfg();
-  var api = prompt('PIT server base URL (no trailing slash):', cur.api || 'https://logistics-pit-staging-staging.up.railway.app');
+  var api = prompt('PIT server base URL (production is default; enter staging URL to override):', cur.api || ST_DEFAULT_API);
   if(api === null) return;
   var key = prompt('Fulfil key:', cur.key || '');
   if(key === null) return;
