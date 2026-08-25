@@ -3845,7 +3845,9 @@ function stCfgPrompt(){
   if(api === null) return;
   var key = prompt('Fulfil key:', cur.key || '');
   if(key === null) return;
-  localStorage.setItem('pit_store_cfg', JSON.stringify({ api: api.replace(/\/+$/,''), key: key }));
+  api = api.trim().replace(/\/+$/,'');
+  if(api && !/^https?:\/\//i.test(api)) api = 'https://' + api;
+  localStorage.setItem('pit_store_cfg', JSON.stringify({ api: api, key: key }));
   renderStorePage();
 }
 function money2(cents){ return '$' + ((cents||0)/100).toFixed(2); }
