@@ -3887,15 +3887,18 @@ function renderStorePage(){
   var bP=document.createElement('button'); bP.className='act'; bP.textContent='Products';
   var bO=document.createElement('button'); bO.className='act'; bO.textContent='Orders';
   var bI=document.createElement('button'); bI.className='act'; bI.textContent='Inventory';
+  var bC=document.createElement('button'); bC.className='act'; bC.textContent='Customers';
   var bG=document.createElement('button'); bG.className='act'; bG.textContent='\u2699';
   bP.onclick=function(){ ST.view='products'; renderStorePage(); };
   bO.onclick=function(){ ST.view='orders'; renderStorePage(); };
   bI.onclick=function(){ ST.view='inventory'; renderStorePage(); };
+  bC.onclick=function(){ ST.view='customers'; renderStorePage(); };
   bG.onclick=stCfgPrompt;
   if(ST.view==='products') bP.setAttribute('aria-current','page');
   if(ST.view==='orders') bO.setAttribute('aria-current','page');
   if(ST.view==='inventory') bI.setAttribute('aria-current','page');
-  head.appendChild(bP); head.appendChild(bO); head.appendChild(bI); head.appendChild(bG);
+  if(ST.view==='customers') bC.setAttribute('aria-current','page');
+  head.appendChild(bP); head.appendChild(bO); head.appendChild(bI); head.appendChild(bC); head.appendChild(bG);
   w.appendChild(head);
 
   var body=document.createElement('div'); body.id='stBody'; body.style.marginTop='12px';
@@ -3905,7 +3908,7 @@ function renderStorePage(){
 
   stLoad(function(err){
     if(err){ body.textContent='Store load failed: '+err; return; }
-    if(ST.view==='products') stRenderProducts(body); else if(ST.view==='inventory') stRenderInventory(body); else stRenderOrders(body);
+    if(ST.view==='products') stRenderProducts(body); else if(ST.view==='inventory') stRenderInventory(body); else if(ST.view==='customers') stRenderCustomers(body); else stRenderOrders(body);
   });
 }
 
@@ -3919,8 +3922,16 @@ function stRenderProducts(body){
 
   var grid=document.createElement('div');
   grid.style.cssText='margin-top:12px;';
-  ST.products.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
-  ST.products.forEach(function(pr){
+  ST.products.sort(function(a,b){ return ((a.sortOrder!=null?a.sortOrder:9999)-(b.sortOrder!=null?b.sortOrder:9999)) || (a.title||'').localeCompare(b.title||''); });
+  function stPersistOrder(){
+    var chain=Promise.resolve();
+    ST.products.forEach(function(pp,i){
+      chain=chain.then(function(){ return fbDb.collection('pit_products').doc(pp.handle).update({ sortOrder:i+1 }); });
+      pp.sortOrder=i+1;
+    });
+    return chain;
+  }
+  ST.products.forEach(function(pr, prIdx){
     var card=document.createElement('div');
     card.style.cssText='display:flex;align-items:center;gap:12px;border:1px solid #b9bdd1;background:#fff;box-shadow:2px 2px 0 #9aa;padding:12px 14px;margin-top:10px;cursor:pointer;';
     var img=(pr.images&&pr.images[0])||'';
@@ -3932,6 +3943,19 @@ function stRenderProducts(body){
       '<span style="font-size:13px;">'+price+'</span>'+
       '<span style="font-size:13px;">stock '+stock+'</span>'+
       '<span style="font-size:11px;letter-spacing:.08em;padding:2px 8px;background:'+(pr.active?'#1e7a3c':'#8a5a00')+';color:#fff;">'+(pr.active?'ACTIVE':'DRAFT')+'</span>';
+    function arrow(dir){
+      var ab=document.createElement('button'); ab.className='act'; ab.textContent=dir<0?'\u2191':'\u2193';
+      ab.style.cssText='min-width:30px;padding:2px 6px;';
+      ab.onclick=function(ev){
+        ev.stopPropagation();
+        var j=prIdx+dir;
+        if(j<0||j>=ST.products.length) return;
+        var tmp=ST.products[prIdx]; ST.products[prIdx]=ST.products[j]; ST.products[j]=tmp;
+        stPersistOrder().then(function(){ renderStorePage(); }).catch(function(er){ alert('Reorder failed: '+(er.message||er)); });
+      };
+      return ab;
+    }
+    card.appendChild(arrow(-1)); card.appendChild(arrow(1));
     card.onclick=function(){ stEditProduct(pr); };
     grid.appendChild(card);
   });
@@ -4040,6 +4064,40 @@ function stEditProduct(pr){
   row.appendChild(save); row.appendChild(back);
   w.appendChild(row); w.appendChild(msg);
   sheet.appendChild(w);
+}
+
+/* ── customers ── */
+function stRenderCustomers(body){
+  body.innerHTML='Loading\u2026';
+  fbDb.collection('pit_orders').get().then(function(snap){
+    var byEmail={};
+    snap.docs.forEach(function(d){
+      var o=d.data();
+      var em=(o.email||'').toLowerCase();
+      if(!em) return;
+      if(!byEmail[em]) byEmail[em]={ email:em, name:'', count:0, spent:0, lastNum:0, lastName:'' };
+      var c=byEmail[em];
+      c.count++;
+      if(o.status!=='refunded') c.spent += parseFloat(o.total_price||'0')||0;
+      var n=(o.shipping_address&&o.shipping_address.name)||'';
+      if((o.order_number||0)>=c.lastNum){ c.lastNum=o.order_number||0; c.lastName=o.name||''; if(n) c.name=n; }
+    });
+    var list=Object.keys(byEmail).map(function(k){ return byEmail[k]; });
+    list.sort(function(a,b){ return b.spent-a.spent; });
+    body.innerHTML='';
+    if(!list.length){ body.textContent='No customers yet.'; return; }
+    list.forEach(function(c){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;gap:12px;align-items:center;border:1px solid #b9bdd1;background:#fff;box-shadow:2px 2px 0 #9aa;padding:12px 14px;margin-top:10px;flex-wrap:wrap;';
+      row.innerHTML =
+        '<span style="font-weight:700;min-width:140px;">'+(c.name||'(no name)')+'</span>'+
+        '<span style="flex:1;font-size:13px;">'+c.email+'</span>'+
+        '<span style="font-size:13px;">'+c.count+' order'+(c.count===1?'':'s')+'</span>'+
+        '<span style="font-weight:700;">$'+c.spent.toFixed(2)+'</span>'+
+        '<span style="font-size:12px;color:#555;">last: '+c.lastName+'</span>';
+      list && body.appendChild(row);
+    });
+  }).catch(function(e){ body.textContent='Load failed: '+(e.message||e); });
 }
 
 /* ── inventory ── */
