@@ -4244,6 +4244,27 @@ function stOrderDetail(o){
   var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;';
   var msg=document.createElement('div'); msg.style.cssText='font-size:13px;margin-top:8px;';
 
+  if(o.fulfillment){
+    var scWrap=document.createElement('div');
+    scWrap.style.cssText='display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;';
+    var cur=((o.fulfillment.shipCostCents||0)/100);
+    var scLbl=document.createElement('span'); scLbl.style.cssText='font-size:13px;font-weight:700;';
+    scLbl.textContent='Ship cost (you paid):';
+    var scIn=document.createElement('input'); scIn.type='text'; scIn.value=cur?cur.toFixed(2):'';
+    scIn.placeholder='0.00'; scIn.style.cssText='padding:6px;border:1px solid #b9bdd1;width:110px;';
+    var scBtn=document.createElement('button'); scBtn.className='act'; scBtn.textContent='Save cost';
+    scBtn.onclick=function(){
+      var cents=Math.round(parseFloat(scIn.value||'0')*100)||0;
+      scBtn.disabled=true;
+      fbDb.collection('pit_orders').doc(o.stripeIntentId).update({ 'fulfillment.shipCostCents': cents })
+        .then(function(){ o.fulfillment.shipCostCents=cents; scBtn.disabled=false; msg.textContent='Ship cost saved.'; })
+        .catch(function(e){ scBtn.disabled=false; msg.textContent='Save failed: '+(e.message||e); });
+    };
+    scWrap.appendChild(scLbl); scWrap.appendChild(scIn); scWrap.appendChild(scBtn);
+    w.appendChild(scWrap);
+  }
+
+
   if(o.status==='paid'){
     var fWrap=document.createElement('div');
     fWrap.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
