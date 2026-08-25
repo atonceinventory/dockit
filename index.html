@@ -3195,7 +3195,14 @@ function render(){
   bhBtn.innerHTML='&#8249; Businesses';
   bhBtn.onclick=function(){ hub=null; S.filter=null; try{ sessionStorage.removeItem('dockit_hub'); }catch(e){} render(); window.scrollTo(0,0); };
   var bhName=document.createElement('span'); bhName.className='bizname'; bhName.textContent = L.name || hub.toUpperCase();
-  bh.appendChild(bhBtn); bh.appendChild(bhName);
+  var backBtn=document.createElement('button'); backBtn.className='bizback';
+  backBtn.innerHTML='&#8249; Back'; backBtn.style.marginLeft='8px';
+  backBtn.onclick=function(){
+    if(S.page==='store' && typeof ST!=='undefined' && ST.sub){ renderStorePage(); return; }
+    if(S.page!=='tasks'){ S.page='tasks'; render(); window.scrollTo(0,0); return; }
+    hub=null; S.filter=null; try{ sessionStorage.removeItem('dockit_hub'); }catch(e){} render(); window.scrollTo(0,0);
+  };
+  bh.appendChild(bhBtn); bh.appendChild(backBtn); bh.appendChild(bhName);
 
   document.getElementById('taskChrome').style.display = (S.page==='tasks') ? '' : 'none';
 
@@ -3878,6 +3885,7 @@ function stLoad(cb){
 }
 
 function renderStorePage(){
+  ST.sub=null;
   sheet.innerHTML='';
   var w=document.createElement('div'); w.className='notif-wrap';
   w.style.cssText='max-width:1100px;margin:0 auto;';
@@ -3966,6 +3974,7 @@ function stRenderProducts(body){
 }
 
 function stEditProduct(pr){
+  ST.sub='editor';
   var isNew = !pr;
   pr = pr || { handle:'', title:'', descriptionHtml:'', active:false, images:[],
                variants:[{ id:String(Date.now()), title:'OSFA', sku:'', priceCents:0, stock:0 }] };
@@ -4225,6 +4234,7 @@ function stRenderOrders(body){
 }
 
 function stOrderDetail(o){
+  ST.sub='detail';
   sheet.innerHTML='';
   var w=document.createElement('div'); w.className='notif-wrap';
   var a=o.shipping_address||{};
