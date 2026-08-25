@@ -35,5 +35,8 @@ service cloud.firestore {
     match /pit_meta/{docId} {
       allow read, write: if owner();
     }
+    match /pit_expenses/{expenseId} {
+      allow read, write: if owner();
+    }
   }
 }

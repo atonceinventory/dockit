@@ -4087,9 +4087,12 @@ function stRenderFinance(body){
   body.innerHTML='Loading\u2026';
   var costById={};
   ST.products.forEach(function(pr){ (pr.variants||[]).forEach(function(v){ costById[String(v.id)]=v.costCents||0; }); });
-  fbDb.collection('pit_orders').get().then(function(snap){
+  Promise.all([
+    fbDb.collection('pit_orders').get(),
+    fbDb.collection('pit_expenses').get()
+  ]).then(function(res){
     var rows=[];
-    snap.docs.forEach(function(d){
+    res[0].docs.forEach(function(d){
       var o=d.data();
       if(o.status==='refunded') return;
       var ts=(o.createdAt && o.createdAt.toDate) ? o.createdAt.toDate() : new Date();
@@ -4098,12 +4101,18 @@ function stRenderFinance(body){
       var cogs=0;
       (o.line_items||[]).forEach(function(li){ cogs += ((costById[String(li.variantId)]||0)/100)*(li.quantity||1); });
       var shipOut=((o.fulfillment&&o.fulfillment.shipCostCents)||0)/100;
-      rows.push({ ts:ts, rev:rev, shipIn:shipIn, cogs:cogs, shipOut:shipOut, n:1 });
+      rows.push({ ts:ts, rev:rev, shipIn:shipIn, cogs:cogs, shipOut:shipOut, exp:0, n:1 });
     });
+    var expenses=res[1].docs.map(function(d){ var e=d.data(); e._id=d.id; return e; });
+    expenses.forEach(function(e){
+      rows.push({ ts: e.date ? new Date(e.date) : new Date(), rev:0, shipIn:0, cogs:0, shipOut:0, exp:(e.amountCents||0)/100, n:0 });
+    });
+
     function agg(list){
-      var t={ n:0, rev:0, shipIn:0, cogs:0, shipOut:0 };
-      list.forEach(function(r){ t.n+=r.n; t.rev+=r.rev; t.shipIn+=r.shipIn; t.cogs+=r.cogs; t.shipOut+=r.shipOut; });
-      t.profit=t.rev-t.cogs-t.shipOut;
+      var t={ n:0, rev:0, shipIn:0, cogs:0, shipOut:0, exp:0 };
+      list.forEach(function(r){ t.n+=r.n; t.rev+=r.rev; t.shipIn+=r.shipIn; t.cogs+=r.cogs; t.shipOut+=r.shipOut; t.exp+=r.exp; });
+      t.gross=t.rev-t.cogs-t.shipOut;
+      t.net=t.rev-t.shipOut-t.exp;
       return t;
     }
     function fyLabel(dt){ var y=dt.getFullYear(); var start=(dt.getMonth()>=6)?y:y-1; return 'FY'+String(start%100).padStart(2,'0')+'/'+String((start+1)%100).padStart(2,'0'); }
@@ -4127,7 +4136,9 @@ function stRenderFinance(body){
         '<span>Shipping in <b>'+money(t.shipIn)+'</b></span>'+
         '<span>COGS <b>'+money(t.cogs)+'</b></span>'+
         '<span>Shipping out <b>'+money(t.shipOut)+'</b></span>'+
-        '<span style="color:'+(t.profit>=0?'#1e7a3c':'#a32222')+';">Profit <b>'+money(t.profit)+'</b></span>'+
+        '<span>Expenses <b>'+money(t.exp)+'</b></span>'+
+        '<span>Gross <b style="color:'+(t.gross>=0?'#1e7a3c':'#a32222')+';">'+money(t.gross)+'</b></span>'+
+        '<span>Net <b style="color:'+(t.net>=0?'#1e7a3c':'#a32222')+';">'+money(t.net)+'</b></span>'+
         '</div>';
       return c;
     }
@@ -4136,7 +4147,51 @@ function stRenderFinance(body){
     fyKeys.forEach(function(k){ body.appendChild(summaryCard(k, agg(byFy[k]))); });
     var moKeys=Object.keys(byMo).sort(function(a,b){ return new Date('1 '+b)-new Date('1 '+a); });
     moKeys.forEach(function(k){ body.appendChild(summaryCard(k, agg(byMo[k]))); });
-    if(!rows.length) body.textContent='No orders yet.';
+
+    /* expenses ledger */
+    var exH=document.createElement('div');
+    exH.style.cssText='font-weight:700;margin-top:20px;';
+    exH.textContent='Expenses';
+    body.appendChild(exH);
+
+    var form=document.createElement('div');
+    form.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;';
+    var dIn=document.createElement('input'); dIn.type='date';
+    dIn.value=new Date().toISOString().slice(0,10);
+    dIn.style.cssText='padding:6px;border:1px solid #b9bdd1;';
+    var lIn=document.createElement('input'); lIn.type='text'; lIn.placeholder='What for (e.g. 45 caps embroidered)';
+    lIn.style.cssText='padding:6px;border:1px solid #b9bdd1;min-width:260px;';
+    var aIn=document.createElement('input'); aIn.type='text'; aIn.placeholder='Amount $';
+    aIn.style.cssText='padding:6px;border:1px solid #b9bdd1;width:110px;';
+    var addB=document.createElement('button'); addB.className='gmc-red'; addB.textContent='Add expense';
+    addB.onclick=function(){
+      var cents=Math.round(parseFloat(aIn.value||'0')*100)||0;
+      if(!lIn.value.trim() || cents<=0){ alert('Need a label and amount.'); return; }
+      addB.disabled=true;
+      fbDb.collection('pit_expenses').add({ date:dIn.value, label:lIn.value.trim(), amountCents:cents, createdAt: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(function(){ renderStorePage(); })
+        .catch(function(e){ addB.disabled=false; alert('Add failed: '+(e.message||e)); });
+    };
+    form.appendChild(dIn); form.appendChild(lIn); form.appendChild(aIn); form.appendChild(addB);
+    body.appendChild(form);
+
+    expenses.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    expenses.forEach(function(e){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;gap:12px;align-items:center;background:var(--surface-2,#fff);border:1px solid var(--line,#b9bdd1);border-left:4px solid var(--pit,#2b3a8f);box-shadow:2px 2px 0 #9aa;padding:10px 14px;margin-top:8px;flex-wrap:wrap;';
+      var del=document.createElement('button'); del.className='act'; del.textContent='\u00d7';
+      del.style.cssText='min-width:30px;padding:2px 8px;margin-left:auto;';
+      del.onclick=function(){
+        if(!confirm('Delete expense: '+e.label+'?')) return;
+        fbDb.collection('pit_expenses').doc(e._id).delete().then(function(){ renderStorePage(); });
+      };
+      var sp1=document.createElement('span'); sp1.style.cssText='font-size:13px;min-width:90px;'; sp1.textContent=e.date||'';
+      var sp2=document.createElement('span'); sp2.style.cssText='flex:1;font-weight:700;'; sp2.textContent=e.label||'';
+      var sp3=document.createElement('span'); sp3.style.cssText='font-weight:700;'; sp3.textContent='$'+((e.amountCents||0)/100).toFixed(2);
+      row.appendChild(sp1); row.appendChild(sp2); row.appendChild(sp3); row.appendChild(del);
+      body.appendChild(row);
+    });
+    if(!rows.length && !expenses.length) body.textContent='No orders or expenses yet.';
   }).catch(function(e){ body.textContent='Load failed: '+(e.message||e); });
 }
 
