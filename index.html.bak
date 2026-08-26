@@ -3406,9 +3406,6 @@ function syncPanel(){
    Photos live on THIS device only (IndexedDB, localStorage
    fallback) — they never go through Firebase sync.          */
 var IGStore = (function(){
-  /* Firestore is the source of truth (private_board/pit_ig).
-     IndexedDB / localStorage are a read cache only, so the grid opens
-     instantly and still shows something offline. */
   var LS='docket.ig.plan';
   var haveIDB = false;
   try{ haveIDB = !!window.indexedDB; }catch(e){}
@@ -3425,7 +3422,7 @@ var IGStore = (function(){
   }
   function lsGet(){ try{ var r=localStorage.getItem(LS); return r?JSON.parse(r):null; }catch(e){ return null; } }
   function lsSet(p){ try{ localStorage.setItem(LS, JSON.stringify(p)); return true; }catch(e){ return false; } }
-  function cacheGet(){
+  function get(){
     if(!haveIDB) return Promise.resolve(lsGet());
     return idb().then(function(db){ return new Promise(function(res){
       var rq=db.transaction('kv').objectStore('kv').get('plan');
@@ -3433,91 +3430,34 @@ var IGStore = (function(){
       rq.onerror=function(){ res(lsGet()); };
     });}).catch(function(){ return lsGet(); });
   }
-  function cacheSet(p){
+  function set(p){
     if(!haveIDB){ return Promise.resolve(lsSet(p)); }
     return idb().then(function(db){ return new Promise(function(res,rej){
       var tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(p,'plan');
       tx.oncomplete=function(){ res(true); }; tx.onerror=function(){ rej(tx.error); };
     });}).catch(function(){ return lsSet(p); });
   }
-  function remoteOK(){
-    try{ return !!fbDb && typeof isOwner==='function' && isOwner(); }catch(e){ return false; }
-  }
-  function docRef(){ return fbDb.collection('private_board').doc('pit_ig'); }
-
-  function get(){
-    if(!remoteOK()) return cacheGet();
-    return docRef().get().then(function(d){
-      var p = d.exists ? (d.data()||{}).plan : null;
-      if(p){ cacheSet(p); return p; }
-      return cacheGet();               // nothing remote yet - fall back
-    }).catch(function(){ return cacheGet(); });
-  }
-
-  function set(p){
-    cacheSet(p);                        // cache first, best effort
-    if(!remoteOK()){
-      return Promise.reject(new Error('Not signed in as owner - saved on this device only'));
-    }
-    return docRef().set({ plan:p, updatedAt:Date.now() }, { merge:true });
-  }
   return { get:get, set:set };
 })();
 
-/* Remove a tile's file from Storage so deletes don't orphan objects. */
-function igDeleteRemote(item){
-  try{
-    var u = (item && typeof item==='object') ? (item.src||item.url) : item;
-    if(!u || typeof u!=='string' || u.indexOf('http')!==0) return;
-    if(typeof firebase==='undefined' || !firebase.storage) return;
-    firebase.storage().refFromURL(u).delete().catch(function(){});
-  }catch(e){}
-}
-
-/* Small fixed save indicator - so a failed write can never look like a good one. */
-function igSaveBadge(state, detail){
-  var el=document.getElementById('igsave');
-  if(state==='gone'){ if(el&&el.parentNode) el.parentNode.removeChild(el); return; }
-  if(!el){
-    el=document.createElement('div'); el.id='igsave';
-    el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:18px;'+
-      'z-index:100000;font-family:system-ui,-apple-system,sans-serif;font-size:12px;'+
-      'padding:7px 14px;border-radius:16px;pointer-events:none;transition:opacity .3s;'+
-      'box-shadow:0 2px 10px rgba(0,0,0,.35);max-width:80vw;text-align:center;';
-    document.body.appendChild(el);
-  }
-  el.style.opacity='1';
-  if(state==='saving'){ el.style.background='#333'; el.style.color='#fff'; el.textContent='Saving...'; }
-  else if(state==='saved'){
-    el.style.background='#1c7c3c'; el.style.color='#fff'; el.textContent='Saved';
-    clearTimeout(el._t); el._t=setTimeout(function(){ el.style.opacity='0'; }, 1400);
-  } else {
-    el.style.background='#a83232'; el.style.color='#fff';
-    el.textContent='NOT SAVED: '+(detail||'unknown error');
-  }
-}
-
 function igDownscale(file){
-  /* Resizes to 720px then uploads to Storage under pitgrid/ (owner-only rules)
-     and resolves with a download URL. Returns a string either way, so every
-     existing caller keeps working. */
   return new Promise(function(res,rej){
-    if(typeof firebase==='undefined' || !firebase.storage){
-      rej(new Error('Storage SDK not loaded')); return;
-    }
-    if(typeof isOwner==='function' && !isOwner()){
-      rej(new Error('Owner sign-in required to upload')); return;
-    }
-    try{
-      stResizeImage(file, 720, function(blob, ext){
-        var path='pitgrid/'+Date.now()+'-'+Math.floor(Math.random()*1e4)+'.'+(ext||'jpg');
-        firebase.storage().ref(path)
-          .put(blob, { cacheControl:'public,max-age=31536000,immutable' })
-          .then(function(snap){ return snap.ref.getDownloadURL(); })
-          .then(function(url){ res(url); })
-          .catch(function(e){ rej(e); });
-      });
-    }catch(e){ rej(e); }
+    var r=new FileReader();
+    r.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        var max=720, sc=Math.min(max/img.width, max/img.height, 1);
+        var c=document.createElement('canvas');
+        c.width=Math.max(1,Math.round(img.width*sc));
+        c.height=Math.max(1,Math.round(img.height*sc));
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        res(c.toDataURL('image/jpeg',0.82));
+      };
+      img.onerror=function(){ rej('bad image'); };
+      img.src=r.result;
+    };
+    r.onerror=function(){ rej('read error'); };
+    r.readAsDataURL(file);
   });
 }
 
@@ -3528,21 +3468,10 @@ function openIG(){
 
   var scrim=document.createElement('div'); scrim.className='ig-scrim';
   document.body.appendChild(scrim);
-  function close(){
-    /* blur first: the text fields commit on change, which only fires on blur,
-       so closing without this silently discarded whatever was being typed */
-    try{ if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(e){}
-    if(scrim.parentNode) scrim.parentNode.removeChild(scrim);
-    document.removeEventListener('keydown',esc);
-    igSaveBadge('gone');
-  }
+  function close(){ if(scrim.parentNode) scrim.parentNode.removeChild(scrim); document.removeEventListener('keydown',esc); }
   function esc(e){ if(e.key==='Escape') close(); }
   document.addEventListener('keydown',esc);
-  function persist(){
-    igSaveBadge('saving');
-    IGStore.set(plan).then(function(){ igSaveBadge('saved'); })
-      .catch(function(e){ igSaveBadge('err', (e && e.message) || String(e)); });
-  }
+  function persist(){ IGStore.set(plan); }
 
   function fetchLive(){
     liveLoading=true; liveErr=''; draw();
@@ -3693,7 +3622,7 @@ function openIG(){
       var pb=document.createElement('span'); pb.className='planbadge'; pb.textContent='PLAN'; cell.appendChild(pb);
       var rm=document.createElement('button'); rm.className='rm'; rm.innerHTML='&#10005;';
       rm.onclick=function(ev){ ev.stopPropagation();
-        igDeleteRemote(plan.photos[idx]); plan.photos.splice(idx,1); sel=null; persist(); draw();
+        plan.photos.splice(idx,1); sel=null; persist(); draw();
       };
       cell.appendChild(rm);
       cell.onclick=function(){
