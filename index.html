@@ -4435,12 +4435,48 @@ function stOrderDetail(o){
     fWrap.appendChild(trIn); fWrap.appendChild(coSel); fWrap.appendChild(costIn); fWrap.appendChild(f);
     row.appendChild(fWrap);
 
+    if(!window.pitConfirm){
+      window.pitConfirm=function(title,body,okLabel){
+        return new Promise(function(resolve){
+          var ov=document.createElement('div');
+          ov.style.cssText='position:fixed;inset:0;background:rgba(10,12,30,.62);display:flex;align-items:center;justify-content:center;z-index:99999;padding:24px;';
+          var bx=document.createElement('div');
+          bx.style.cssText='background:#fff;border:1px solid #b9bdd1;border-left:4px solid var(--pit,#3b45c7);max-width:340px;width:100%;padding:18px;box-shadow:0 12px 40px rgba(0,0,0,.35);';
+          var h=document.createElement('div');
+          h.style.cssText='font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--pit,#3b45c7);margin-bottom:8px;';
+          h.textContent=title;
+          var bd=document.createElement('div');
+          bd.style.cssText='font-family:var(--mono);font-size:11.5px;line-height:1.5;color:#1b2140;margin-bottom:16px;';
+          bd.textContent=body;
+          var br=document.createElement('div');
+          br.style.cssText='display:flex;gap:8px;justify-content:flex-end;';
+          var mk=function(label,primary){
+            var b=document.createElement('button');
+            b.textContent=label;
+            b.style.cssText='font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:8px 14px;cursor:pointer;border:1px solid '+(primary?'var(--pit,#3b45c7)':'#b9bdd1')+';background:'+(primary?'var(--pit,#3b45c7)':'#fff')+';color:'+(primary?'#fff':'#1b2140')+';';
+            return b;
+          };
+          var no=mk('Cancel',false), yes=mk(okLabel||'OK',true);
+          var esc=function(e){ if(e.key==='Escape') done(false); };
+          var done=function(v){ if(ov.parentNode) ov.parentNode.removeChild(ov); document.removeEventListener('keydown',esc); resolve(v); };
+          no.onclick=function(){ done(false); };
+          yes.onclick=function(){ done(true); };
+          ov.onclick=function(e){ if(e.target===ov) done(false); };
+          document.addEventListener('keydown',esc);
+          br.appendChild(no); br.appendChild(yes);
+          bx.appendChild(h); bx.appendChild(bd); bx.appendChild(br);
+          ov.appendChild(bx); document.body.appendChild(ov);
+        });
+      };
+    }
     var rf=document.createElement('button'); rf.className='act'; rf.textContent='Mark refunded';
     rf.onclick=function(){
-      if(!confirm('Mark '+o.name+' refunded? (Refund the money in Stripe separately.)')) return;
-      fbDb.collection('pit_orders').doc(o.stripeIntentId).update({ status:'refunded' })
-        .then(function(){ ST.view='orders'; renderStorePage(); })
-        .catch(function(e){ msg.textContent='Failed: '+(e.message||e); });
+      window.pitConfirm(o.name+' \u2192 REFUNDED','Marks the order only. Refund the money in Stripe separately.','Mark').then(function(ok){
+        if(!ok) return;
+        fbDb.collection('pit_orders').doc(o.stripeIntentId).update({ status:'refunded' })
+          .then(function(){ ST.view='orders'; renderStorePage(); })
+          .catch(function(e){ msg.textContent='Failed: '+(e.message||e); });
+      });
     };
     row.appendChild(rf);
   }
@@ -4450,15 +4486,17 @@ function stOrderDetail(o){
     dv.onclick=function(){
       var cfg=stCfg();
       if(!cfg.api||!cfg.key){ msg.textContent='Set server URL + key first (\u2699).'; return; }
-      if(!confirm('Mark '+o.name+' delivered and email the customer?')) return;
-      dv.disabled=true; msg.textContent='Sending\u2026';
-      fetch(cfg.api+'/api/pit-deliver',{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ key:cfg.key, orderName:o.name })
-      }).then(function(r){ return r.json(); }).then(function(res){
-        if(res&&res.delivered){ ST.view='orders'; renderStorePage(); }
-        else { dv.disabled=false; msg.textContent='Failed: '+((res&&res.error)||'unknown'); }
-      }).catch(function(e){ dv.disabled=false; msg.textContent='Failed: '+(e.message||e); });
+      window.pitConfirm(o.name+' \u2192 DELIVERED','The customer will be emailed a Delivery Manifest.','Send').then(function(ok){
+        if(!ok) return;
+        dv.disabled=true; msg.textContent='Sending\u2026';
+        fetch(cfg.api+'/api/pit-deliver',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ key:cfg.key, orderName:o.name })
+        }).then(function(r){ return r.json(); }).then(function(res){
+          if(res&&res.delivered){ ST.view='orders'; renderStorePage(); }
+          else { dv.disabled=false; msg.textContent='Failed: '+((res&&res.error)||'unknown'); }
+        }).catch(function(e){ dv.disabled=false; msg.textContent='Failed: '+(e.message||e); });
+      });
     };
     row.appendChild(dv);
   }
