@@ -4404,37 +4404,6 @@ function stOrderDetail(o){
   }
 
 
-  if(o.status==='paid'){
-    var fWrap=document.createElement('div');
-    fWrap.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
-    var trIn=document.createElement('input'); trIn.type='text'; trIn.placeholder='Tracking number';
-    trIn.style.cssText='padding:6px;border:1px solid #b9bdd1;min-width:220px;';
-    var coSel=document.createElement('select'); coSel.style.cssText='padding:6px;border:1px solid #b9bdd1;';
-    Object.keys(ST_CARRIERS).forEach(function(k){ var o2=document.createElement('option'); o2.value=k; o2.textContent=k; coSel.appendChild(o2); });
-    var f=document.createElement('button'); f.className='gmc-red'; f.textContent='Fulfil';
-    f.onclick=function(){
-      var cfg=stCfg();
-      if(!cfg.api||!cfg.key){ msg.textContent='Set server URL + key first (\u2699).'; return; }
-      var co=coSel.value;
-      var hand=(co==='Hand Deliver');
-      var tr=trIn.value.trim();
-      if(!tr && !hand){ msg.textContent='Enter a tracking number.'; return; }
-      var turl=(!hand && ST_CARRIERS[co]) ? ST_CARRIERS[co].replace('{N}', encodeURIComponent(tr)) : '';
-      if(hand) co='Hand Delivery';
-      f.disabled=true; msg.textContent='Fulfilling\u2026';
-      fetch(cfg.api+'/api/pit-fulfill',{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ key:cfg.key, orderName:o.name, tracking:tr, company:co, trackingUrl:turl, shipCostCents: Math.round(parseFloat(costIn.value||'0')*100)||0 })
-      }).then(function(r){ return r.json(); }).then(function(res){
-        if(res&&res.fulfilled){ ST.view='orders'; renderStorePage(); }
-        else { f.disabled=false; msg.textContent='Failed: '+((res&&res.error)||'unknown'); }
-      }).catch(function(e){ f.disabled=false; msg.textContent='Failed: '+(e.message||e); });
-    };
-    var costIn=document.createElement('input'); costIn.type='text'; costIn.placeholder='Ship cost $ (you paid)';
-    costIn.style.cssText='padding:6px;border:1px solid #b9bdd1;width:150px;';
-    fWrap.appendChild(trIn); fWrap.appendChild(coSel); fWrap.appendChild(costIn); fWrap.appendChild(f);
-    row.appendChild(fWrap);
-
     if(!window.pitConfirm){
       window.pitConfirm=function(title,body,okLabel){
         return new Promise(function(resolve){
@@ -4469,6 +4438,38 @@ function stOrderDetail(o){
         });
       };
     }
+
+  if(o.status==='paid'){
+    var fWrap=document.createElement('div');
+    fWrap.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+    var trIn=document.createElement('input'); trIn.type='text'; trIn.placeholder='Tracking number';
+    trIn.style.cssText='padding:6px;border:1px solid #b9bdd1;min-width:220px;';
+    var coSel=document.createElement('select'); coSel.style.cssText='padding:6px;border:1px solid #b9bdd1;';
+    Object.keys(ST_CARRIERS).forEach(function(k){ var o2=document.createElement('option'); o2.value=k; o2.textContent=k; coSel.appendChild(o2); });
+    var f=document.createElement('button'); f.className='gmc-red'; f.textContent='Fulfil';
+    f.onclick=function(){
+      var cfg=stCfg();
+      if(!cfg.api||!cfg.key){ msg.textContent='Set server URL + key first (\u2699).'; return; }
+      var co=coSel.value;
+      var hand=(co==='Hand Deliver');
+      var tr=trIn.value.trim();
+      if(!tr && !hand){ msg.textContent='Enter a tracking number.'; return; }
+      var turl=(!hand && ST_CARRIERS[co]) ? ST_CARRIERS[co].replace('{N}', encodeURIComponent(tr)) : '';
+      if(hand) co='Hand Delivery';
+      f.disabled=true; msg.textContent='Fulfilling\u2026';
+      fetch(cfg.api+'/api/pit-fulfill',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ key:cfg.key, orderName:o.name, tracking:tr, company:co, trackingUrl:turl, shipCostCents: Math.round(parseFloat(costIn.value||'0')*100)||0 })
+      }).then(function(r){ return r.json(); }).then(function(res){
+        if(res&&res.fulfilled){ ST.view='orders'; renderStorePage(); }
+        else { f.disabled=false; msg.textContent='Failed: '+((res&&res.error)||'unknown'); }
+      }).catch(function(e){ f.disabled=false; msg.textContent='Failed: '+(e.message||e); });
+    };
+    var costIn=document.createElement('input'); costIn.type='text'; costIn.placeholder='Ship cost $ (you paid)';
+    costIn.style.cssText='padding:6px;border:1px solid #b9bdd1;width:150px;';
+    fWrap.appendChild(trIn); fWrap.appendChild(coSel); fWrap.appendChild(costIn); fWrap.appendChild(f);
+    row.appendChild(fWrap);
+
     var rf=document.createElement('button'); rf.className='act'; rf.textContent='Mark refunded';
     rf.onclick=function(){
       window.pitConfirm(o.name+' \u2192 REFUNDED','Marks the order only. Refund the money in Stripe separately.','Mark').then(function(ok){
