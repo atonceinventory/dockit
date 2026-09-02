@@ -58,6 +58,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{min-height:100%}
+html{overflow-x:clip}
 body{
   font-family:var(--sans);
   background:var(--bg);
@@ -536,6 +537,11 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 
 /* ── page switcher ───────────────────────── */
 .pages{display:flex;gap:6px;margin:2px var(--pad) 0;padding:0 0 2px}
+@media (max-width:899px){
+  .pages{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-right:var(--pad)}
+  .pages::-webkit-scrollbar{display:none}
+  .pages button{flex:none;white-space:nowrap}
+}
 .pages button{
   font-size:13px;font-weight:600;letter-spacing:.01em;color:var(--fg-mut);
   padding:8px 14px;border-radius:9px 9px 0 0;
@@ -4018,13 +4024,13 @@ function stRenderProducts(body){
   }
   ST.products.forEach(function(pr, prIdx){
     var card=document.createElement('div');
-    card.style.cssText='display:flex;align-items:center;gap:12px;background:var(--surface-2,#fff);border:1px solid var(--line,#b9bdd1);border-left:4px solid var(--pit, #2b3a8f);box-shadow:2px 2px 0 #9aa;padding:12px 14px;margin-top:10px;cursor:pointer;';
+    card.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--surface-2,#fff);border:1px solid var(--line,#b9bdd1);border-left:4px solid var(--pit, #2b3a8f);box-shadow:2px 2px 0 #9aa;padding:12px 14px;margin-top:10px;cursor:pointer;';
     var img=(pr.images&&pr.images[0])||'';
     var stock=(pr.variants||[]).reduce(function(n,v){ return n+(v.stock||0); },0);
     var price=(pr.variants&&pr.variants[0])?money2(pr.variants[0].priceCents):'';
     card.innerHTML =
       (img?'<img src="'+img+'" style="width:48px;height:48px;object-fit:cover;display:block;border:1px solid #d5d8e6;">':'<span style="width:48px;height:48px;display:inline-block;background:#e4e6f0;"></span>')+
-      '<span style="font-weight:700;flex:1;">'+(pr.title||'(untitled)')+'</span>'+
+      '<span style="font-weight:700;flex:1 1 140px;min-width:0;">'+(pr.title||'(untitled)')+'</span>'+
       '<span style="font-size:13px;">'+price+'</span>'+
       '<span style="font-size:13px;">stock '+stock+'</span>'+
       '<span style="font-size:11px;letter-spacing:.08em;padding:2px 8px;background:'+(pr.active?'#1e7a3c':'#8a5a00')+';color:#fff;">'+(pr.active?'ACTIVE':'DRAFT')+'</span>';
