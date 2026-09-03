@@ -422,6 +422,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .ct-info{flex:1;min-width:0}
 .ct-name{font-family:var(--sans);font-size:15px;font-weight:700;color:#12143a}
 .ct-co{font-weight:400;color:var(--fg-mut)}
+.ct-biz{display:inline-block;margin-left:8px;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 6px;background:var(--navy);color:#fff;vertical-align:middle}
 .ct-meta{font-family:var(--sans);font-size:13px;color:var(--fg-mut);margin-top:2px}
 .ct-meta a{color:var(--navy);text-decoration:none}
 .ct-meta a:hover{text-decoration:underline}
@@ -3002,7 +3003,7 @@ function addTaskOnDate(iso){
 }
 
 /* ═══ Contacts — existing client address book (shared) ════ */
-var contactDraft={name:'',company:'',phone:'',email:''};
+var contactDraft={name:'',company:'',phone:'',email:'',biz:'gmc',action:''};
 var contactEditId=null;
 
 function renderContacts(){
@@ -3029,6 +3030,14 @@ function renderContacts(){
     inp.onkeydown=function(e){ if(e.key==='Enter') saveContact(); };
     grid.appendChild(inp);
   });
+  var bizSel=document.createElement('select'); bizSel.className='ct-in';
+  allowedLaneKeys().forEach(function(k){ var op=document.createElement('option'); op.value=k; op.textContent='For: '+(LANE[k]?LANE[k].code+' \u2013 '+LANE[k].name:k); if((contactDraft.biz||'gmc')===k) op.selected=true; bizSel.appendChild(op); });
+  bizSel.onchange=function(){ contactDraft.biz=bizSel.value; };
+  grid.appendChild(bizSel);
+  var actSel=document.createElement('select'); actSel.className='ct-in';
+  [['','Next action: none'],['Email','Next action: Email'],['Call','Next action: Call'],['Message','Next action: Message'],['Meet','Next action: Meet']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if((contactDraft.action||'')===o[0]) op.selected=true; actSel.appendChild(op); });
+  actSel.onchange=function(){ contactDraft.action=actSel.value; };
+  grid.appendChild(actSel);
   form.appendChild(grid);
   var actions=document.createElement('div'); actions.className='ct-form-actions';
   var saveBtn=document.createElement('button'); saveBtn.className='ct-save'; saveBtn.textContent=contactEditId?'Save changes':'Add client';
@@ -3036,7 +3045,7 @@ function renderContacts(){
   actions.appendChild(saveBtn);
   if(contactEditId){
     var cancel=document.createElement('button'); cancel.className='ct-cancel'; cancel.textContent='Cancel';
-    cancel.onclick=function(){ contactEditId=null; contactDraft={name:'',company:'',phone:'',email:''}; render(); };
+    cancel.onclick=function(){ contactEditId=null; contactDraft={name:'',company:'',phone:'',email:'',biz:'gmc',action:''}; render(); };
     actions.appendChild(cancel);
   }
   form.appendChild(actions);
@@ -3053,6 +3062,7 @@ function renderContacts(){
     var info=document.createElement('div'); info.className='ct-info';
     var nm=document.createElement('div'); nm.className='ct-name'; nm.textContent=c.name||'(no name)';
     if(c.company){ var co=document.createElement('span'); co.className='ct-co'; co.textContent=' \u00b7 '+c.company; nm.appendChild(co); }
+    var bz=document.createElement('span'); bz.className='ct-biz'; bz.textContent=(LANE[c.biz||'gmc']?LANE[c.biz||'gmc'].code:(c.biz||'gmc').toUpperCase()); nm.appendChild(bz);
     info.appendChild(nm);
     var meta=document.createElement('div'); meta.className='ct-meta';
     var bits=[];
@@ -3063,9 +3073,9 @@ function renderContacts(){
     row.appendChild(info);
     var acts=document.createElement('div'); acts.className='ct-card-acts';
     var edit=document.createElement('button'); edit.className='ct-edit'; edit.textContent='Edit';
-    edit.onclick=function(){ contactEditId=c.id; contactDraft={name:c.name||'',company:c.company||'',phone:c.phone||'',email:c.email||''}; render(); window.scrollTo(0,0); };
+    edit.onclick=function(){ contactEditId=c.id; contactDraft={name:c.name||'',company:c.company||'',phone:c.phone||'',email:c.email||'',biz:c.biz||'gmc',action:c.action||''}; render(); window.scrollTo(0,0); };
     var del=document.createElement('button'); del.className='ct-x'; del.innerHTML='&#10005;'; del.title='Delete';
-    del.onclick=function(){ if(confirm('Delete '+(c.name||'this contact')+'?')){ S.contacts=S.contacts.filter(function(x){return x.id!==c.id;}); saveLocal(); pushRemote(true); if(contactEditId===c.id){contactEditId=null;contactDraft={name:'',company:'',phone:'',email:''};} render(); } };
+    del.onclick=function(){ if(confirm('Delete '+(c.name||'this contact')+'?')){ S.contacts=S.contacts.filter(function(x){return x.id!==c.id;}); saveLocal(); pushRemote(true); if(contactEditId===c.id){contactEditId=null;contactDraft={name:'',company:'',phone:'',email:'',biz:'gmc',action:''};} render(); } };
     acts.appendChild(edit); acts.appendChild(del);
     row.appendChild(acts);
     list.appendChild(row);
@@ -3073,16 +3083,27 @@ function renderContacts(){
   sheet.appendChild(list);
 }
 
+function contactTaskText(d){
+  var t=d.action+' '+(d.name||'contact')+(d.company?(' \u2013 '+d.company):'');
+  var detail = d.action==='Email' ? d.email : ((d.action==='Call'||d.action==='Message') ? d.phone : '');
+  if(detail) t+=' ('+detail+')';
+  return t;
+}
+function contactFollowUp(d){
+  if(!d.action) return;
+  S.tasks.unshift({ id:uid(), text:contactTaskText(d), lane:(d.biz||'gmc'), kind:'task', due:null, done:false, created:Date.now() });
+}
 function saveContact(){
   var d=contactDraft;
   if(contactEditId){
     var c=S.contacts.filter(function(x){return x.id===contactEditId;})[0];
-    if(c){ c.name=d.name; c.company=d.company; c.phone=d.phone; c.email=d.email; }
+    if(c){ var prevAct=c.action||''; c.name=d.name; c.company=d.company; c.phone=d.phone; c.email=d.email; c.biz=d.biz||'gmc'; c.action=d.action||''; if(c.action && c.action!==prevAct) contactFollowUp(d); }
     contactEditId=null;
   } else {
-    S.contacts.push({id:uid(), name:d.name, company:d.company, phone:d.phone, email:d.email});
+    S.contacts.push({id:uid(), name:d.name, company:d.company, phone:d.phone, email:d.email, biz:d.biz||'gmc', action:d.action||''});
+    contactFollowUp(d);
   }
-  contactDraft={name:'',company:'',phone:'',email:''};
+  contactDraft={name:'',company:'',phone:'',email:'',biz:'gmc',action:''};
   saveLocal(); pushRemote(true); render();
 }
 
