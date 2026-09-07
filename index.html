@@ -985,6 +985,19 @@ nav button[aria-current="page"]{ background:var(--navy); color:#fff; }
 .pj2-notes{background:var(--surface-2);border:1px solid var(--line);border-top:none;padding:8px 12px 10px}
 .pj2-notes-ta{width:100%;min-height:70px;resize:vertical;font-family:var(--sans);font-size:13.5px;line-height:1.5;color:#12143a;background:#fff;border:2px solid;border-color:#6a6d82 #eef0fb #eef0fb #6a6d82;padding:9px 11px;box-sizing:border-box}
 .pj-breakdown{font-family:var(--sans);font-size:12px;color:var(--fg-mut);background:var(--surface-2);border:1px solid var(--line);border-top:none;padding:6px 12px}
+.pj-docs{background:var(--surface);border:1px solid var(--line);margin-top:8px}
+.pj-docs-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg-mut)}
+.pj-upload{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--navy);background:var(--surface-2);border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;padding:6px 12px;cursor:pointer}
+.pj-upload.busy{opacity:.6;cursor:default}
+.pj-doc-list{border-top:1px solid var(--line)}
+.pj-doc{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--line);font-family:var(--sans);font-size:13px}
+.pj-doc:last-child{border-bottom:none}
+.pj-doc-name{flex:1;min-width:0;color:var(--navy);font-weight:700;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pj-doc-name:hover{text-decoration:underline}
+.pj-doc-meta{flex:none;font-size:11.5px;color:var(--fg-mut)}
+.pj-doc-x{flex:none;color:var(--fg-dim);background:none;border:none;font-size:12px;cursor:pointer;padding:2px 6px}
+.pj-doc-x:hover{color:#a83232}
+.pj-doc-err{font-family:var(--sans);font-size:12px;color:#7a2e12;background:rgba(201,154,30,.14);padding:7px 12px}
 /* clean card list */
 .pj2-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .pj2-card{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line-2);padding:9px 12px}
@@ -2308,6 +2321,36 @@ function renderProjects(){
   },1000); }
 }
 
+var docUploading={}, docErr={};
+function fmtBytes(b){ b=b||0; if(b<1024) return b+' B'; if(b<1048576) return Math.round(b/1024)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
+function safeName(n){ return (n||'file').replace(/[^\w.\-() ]+/g,'_').slice(0,120); }
+function uploadProjectDocs(p, files){
+  if(!files||!files.length) return;
+  if(!(window.firebase && firebase.storage)){ docErr[p.id]='File storage is not available right now.'; render(); return; }
+  if(!fbUser){ docErr[p.id]='Sign in to upload documents.'; render(); return; }
+  var MAX=25*1024*1024, list=Array.prototype.slice.call(files);
+  docUploading[p.id]=true; docErr[p.id]=null; render();
+  var chain=Promise.resolve();
+  list.forEach(function(file){
+    chain=chain.then(function(){
+      if(file.size>MAX){ docErr[p.id]='"'+file.name+'" is over the 25 MB limit.'; return; }
+      var id=uid(); var path='projects/'+p.id+'/'+id+'_'+safeName(file.name);
+      return firebase.storage().ref(path).put(file, { contentType: file.type||'application/octet-stream' })
+        .then(function(snap){ return snap.ref.getDownloadURL(); })
+        .then(function(url){
+          if(!p.docs) p.docs=[];
+          p.docs.push({ id:id, name:file.name, path:path, url:url, size:file.size, type:file.type||'', by:emailLc()||'', at:Date.now() });
+          saveLocal(); pushRemote(true);
+        });
+    });
+  });
+  chain.catch(function(e){ docErr[p.id]='Upload failed: '+((e&&e.message)||'check Storage rules'); })
+       .then(function(){ docUploading[p.id]=false; render(); });
+}
+function removeProjectDoc(p, doc){
+  p.docs=(p.docs||[]).filter(function(x){return x.id!==doc.id;}); saveLocal(); pushRemote(true); render();
+  try{ if(doc.path && window.firebase && firebase.storage) firebase.storage().ref(doc.path).delete().catch(function(){}); }catch(e){}
+}
 function projectBlock(p){
   if(!p.tasks) p.tasks=[];
   var block=document.createElement('div'); block.className='pj-block'; block.setAttribute('data-pid',p.id);
@@ -2322,7 +2365,7 @@ function projectBlock(p){
   db.textContent = p.deadline ? ('Due '+fmtDue(p.deadline).label) : '+ Deadline';
   db.onclick=function(){ openCal(p.deadline, function(iso){ p.deadline=iso; save(); render(); }); };
   var del=document.createElement('button'); del.className='pj-del'; del.innerHTML='&#10005;'; del.title='Delete project';
-  del.onclick=function(){ if(confirm('Delete "'+(p.name||'this project')+'" and its tasks?')){ if(S.timer&&S.timer.projectId===p.id)S.timer=null; S.projects=S.projects.filter(function(x){return x.id!==p.id;}); save(); render(); } };
+  del.onclick=function(){ if(confirm('Delete "'+(p.name||'this project')+'" and its tasks?')){ if(S.timer&&S.timer.projectId===p.id)S.timer=null; (p.docs||[]).forEach(function(doc){ try{ if(doc.path&&window.firebase&&firebase.storage) firebase.storage().ref(doc.path).delete().catch(function(){}); }catch(e){} }); S.projects=S.projects.filter(function(x){return x.id!==p.id;}); save(); render(); } };
   hd.appendChild(nm); hd.appendChild(prog);
   if(projectAtRisk(p)){ var r=document.createElement('span'); r.className='pj-risk'; r.textContent='At risk'; hd.appendChild(r); }
 
@@ -2347,6 +2390,33 @@ function projectBlock(p){
   var list=document.createElement('div'); list.className='pj2-list';
   p.tasks.forEach(function(t){ list.appendChild(projectTaskCard(p,t)); });
   block.appendChild(list);
+
+  // documents (Firebase Storage)
+  if(!p.docs) p.docs=[];
+  var ds=document.createElement('div'); ds.className='pj-docs';
+  var dh=document.createElement('div'); dh.className='pj-docs-head';
+  var dt=document.createElement('span'); dt.textContent='Documents'+(p.docs.length?' ('+p.docs.length+')':''); dh.appendChild(dt);
+  var up=document.createElement('label'); up.className='pj-upload'+(docUploading[p.id]?' busy':''); up.textContent=docUploading[p.id]?'Uploading\u2026':'+ Attach file';
+  var fi=document.createElement('input'); fi.type='file'; fi.multiple=true; fi.style.display='none';
+  fi.onchange=function(){ uploadProjectDocs(p, fi.files); };
+  up.appendChild(fi); dh.appendChild(up);
+  ds.appendChild(dh);
+  if(p.docs.length){
+    var dl=document.createElement('div'); dl.className='pj-doc-list';
+    p.docs.forEach(function(doc){
+      var row=document.createElement('div'); row.className='pj-doc';
+      var a=document.createElement('a'); a.className='pj-doc-name'; a.href=doc.url; a.target='_blank'; a.rel='noopener'; a.textContent=doc.name;
+      var meta=document.createElement('span'); meta.className='pj-doc-meta';
+      meta.textContent=fmtBytes(doc.size)+(doc.by?(' \u00b7 '+personLabel(doc.by)):'')+(doc.at?(' \u00b7 '+new Date(doc.at).toLocaleDateString('en-AU')):'');
+      var x=document.createElement('button'); x.className='pj-doc-x'; x.innerHTML='&#10005;'; x.title='Remove document';
+      x.onclick=function(){ if(confirm('Remove "'+doc.name+'"?')) removeProjectDoc(p, doc); };
+      row.appendChild(a); row.appendChild(meta); row.appendChild(x);
+      dl.appendChild(row);
+    });
+    ds.appendChild(dl);
+  }
+  if(docErr[p.id]){ var er=document.createElement('div'); er.className='pj-doc-err'; er.textContent=docErr[p.id]; ds.appendChild(er); }
+  block.appendChild(ds);
 
   var add=document.createElement('button'); add.className='pj-add'; add.textContent='+ Add task';
   add.onclick=function(){ p.tasks.push({ id:uid(), title:'', status:'notstarted', prio:'medium', due:null, assignee:'griff', notes:'' }); save(); render(); };
