@@ -4498,6 +4498,29 @@ function stOrderDetail(o){
     };
     scWrap.appendChild(scLbl); scWrap.appendChild(scIn); scWrap.appendChild(scBtn);
     w.appendChild(scWrap);
+
+    // edit tracking number / carrier (fix a wrong label without re-fulfilling)
+    var teWrap=document.createElement('div');
+    teWrap.style.cssText='display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;';
+    var teLbl=document.createElement('span'); teLbl.style.cssText='font-size:13px;font-weight:700;'; teLbl.textContent='Tracking:';
+    var teIn=document.createElement('input'); teIn.type='text'; teIn.value=o.fulfillment.tracking_number||''; teIn.placeholder='Tracking number';
+    teIn.style.cssText='padding:6px;border:1px solid #b9bdd1;min-width:200px;';
+    var teSel=document.createElement('select'); teSel.style.cssText='padding:6px;border:1px solid #b9bdd1;';
+    var curCo=o.fulfillment.tracking_company||'';
+    Object.keys(ST_CARRIERS).forEach(function(k){ var o2=document.createElement('option'); o2.value=k; o2.textContent=k; if(k===curCo||(k==='Hand Deliver'&&curCo==='Hand Delivery')) o2.selected=true; teSel.appendChild(o2); });
+    var teBtn=document.createElement('button'); teBtn.className='act'; teBtn.textContent='Save tracking';
+    teBtn.onclick=function(){
+      var co=teSel.value, hand=(co==='Hand Deliver'), tr=teIn.value.trim();
+      if(!tr && !hand){ msg.textContent='Enter a tracking number.'; return; }
+      var turl=(!hand && ST_CARRIERS[co]) ? ST_CARRIERS[co].replace('{N}', encodeURIComponent(tr)) : '';
+      if(hand) co='Hand Delivery';
+      teBtn.disabled=true;
+      fbDb.collection('pit_orders').doc(o.stripeIntentId).update({ 'fulfillment.tracking_number':tr, 'fulfillment.tracking_company':co, 'fulfillment.tracking_url':turl })
+        .then(function(){ o.fulfillment.tracking_number=tr; o.fulfillment.tracking_company=co; o.fulfillment.tracking_url=turl; teBtn.disabled=false; msg.textContent='Tracking updated (customer not re-emailed).'; })
+        .catch(function(e){ teBtn.disabled=false; msg.textContent='Save failed: '+(e.message||e); });
+    };
+    teWrap.appendChild(teLbl); teWrap.appendChild(teIn); teWrap.appendChild(teSel); teWrap.appendChild(teBtn);
+    w.appendChild(teWrap);
   }
 
 
@@ -4597,6 +4620,18 @@ function stOrderDetail(o){
       });
     };
     row.appendChild(dv);
+
+    var cx=document.createElement('button'); cx.className='act'; cx.textContent='Cancel fulfilment';
+    cx.onclick=function(){
+      window.pitConfirm(o.name+' \u2192 BACK TO PAID','Clears the tracking details and returns the order to Paid so you can fulfil it again with new details. The customer is not notified.','Cancel fulfilment').then(function(ok){
+        if(!ok) return;
+        cx.disabled=true; msg.textContent='Reverting\u2026';
+        fbDb.collection('pit_orders').doc(o.stripeIntentId).update({ status:'paid', fulfillment: firebase.firestore.FieldValue.delete() })
+          .then(function(){ ST.view='orders'; renderStorePage(); })
+          .catch(function(e){ cx.disabled=false; msg.textContent='Failed: '+(e.message||e); });
+      });
+    };
+    row.appendChild(cx);
   }
   var back=document.createElement('button'); back.className='act'; back.textContent='Back';
   back.onclick=function(){ ST.view='orders'; renderStorePage(); };
