@@ -2388,7 +2388,14 @@ function projectBlock(p){
 
   // task cards
   var list=document.createElement('div'); list.className='pj2-list';
-  p.tasks.forEach(function(t){ list.appendChild(projectTaskCard(p,t)); });
+  var sortedTasks=p.tasks.map(function(t,i){ return {t:t,i:i}; }).sort(function(a,b){
+    var ad=a.t.due||'', bd=b.t.due||'';
+    if(ad&&bd) return ad<bd?-1:(ad>bd?1:a.i-b.i);
+    if(ad) return -1;
+    if(bd) return 1;
+    return a.i-b.i;
+  }).map(function(x){ return x.t; });
+  sortedTasks.forEach(function(t){ list.appendChild(projectTaskCard(p,t)); });
   block.appendChild(list);
 
   // documents (Firebase Storage)
@@ -2416,11 +2423,11 @@ function projectBlock(p){
     ds.appendChild(dl);
   }
   if(docErr[p.id]){ var er=document.createElement('div'); er.className='pj-doc-err'; er.textContent=docErr[p.id]; ds.appendChild(er); }
-  block.appendChild(ds);
 
   var add=document.createElement('button'); add.className='pj-add'; add.textContent='+ Add task';
   add.onclick=function(){ p.tasks.push({ id:uid(), title:'', status:'notstarted', prio:'medium', due:null, assignee:'griff', notes:'' }); save(); render(); };
   block.appendChild(add);
+  block.appendChild(ds);
   return block;
 }
 
