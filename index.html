@@ -2405,6 +2405,8 @@ function projectBlock(p){
   // task cards
   var list=document.createElement('div'); list.className='pj2-list';
   var sortedTasks=p.tasks.map(function(t,i){ return {t:t,i:i}; }).sort(function(a,b){
+    var ac=(a.t.status==='complete')?0:1, bc=(b.t.status==='complete')?0:1;
+    if(ac!==bc) return ac-bc;
     var ad=a.t.due||'', bd=b.t.due||'';
     if(ad&&bd) return ad<bd?-1:(ad>bd?1:a.i-b.i);
     if(ad) return -1;
