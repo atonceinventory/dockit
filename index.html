@@ -4044,16 +4044,13 @@ function openMyList(){
     myList.forEach(function(it){
       var r=document.createElement('div'); r.className='ml-item'+(it.done?' done':'');
       var cb=document.createElement('button'); cb.className='ml-chk'+(it.done?' on':''); cb.innerHTML=it.done?'&#10003;':'';
-      cb.onclick=function(){ it.done=!it.done; myListSave(); draw(); };
+      cb.onclick=function(){ myList=myList.filter(function(x){return x.id!==it.id;}); myListSave(); draw(); };
       var tx=document.createElement('span'); tx.className='ml-text'; tx.textContent=it.text;
       var rm=document.createElement('button'); rm.className='ml-rm'; rm.innerHTML='&#10005;'; rm.title='Remove';
       rm.onclick=function(){ myList=myList.filter(function(x){return x.id!==it.id;}); myListSave(); draw(); };
       r.appendChild(cb); r.appendChild(tx); r.appendChild(rm); list.appendChild(r);
     });
-    var doneN=myList.filter(function(x){return x.done;}).length;
     foot.innerHTML='';
-    if(doneN){ var cl=document.createElement('button'); cl.className='ml-clear'; cl.textContent='Clear '+doneN+' done';
-      cl.onclick=function(){ myList=myList.filter(function(x){return !x.done;}); myListSave(); draw(); }; foot.appendChild(cl); }
   }
   draw();
   box.appendChild(body);
