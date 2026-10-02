@@ -4251,11 +4251,44 @@ function stEditProduct(pr){
   }
   var fTitle=field('Title', pr.title);
   var fDesc=field('Description (HTML ok)', pr.descriptionHtml, 'area');
-  var fVar=field('Variant label', v.title);
-  var fSku=field('SKU', v.sku);
-  var fPrice=field('Price (AUD, e.g. 69.95)', v.priceCents?(v.priceCents/100).toFixed(2):'');
-  var fCost=field('Cost per unit (AUD, what it costs you)', v.costCents?(v.costCents/100).toFixed(2):'');
-  var fStock=field('Stock', String(v.stock||0));
+  var fTags=field('Tags (comma separated, e.g. plaid, red, cap)', (pr.tags||[]).join(', '));
+  var fPrice=field('Price (AUD, e.g. 69.95) \u2014 applies to every variant', v.priceCents?(v.priceCents/100).toFixed(2):'');
+  var fCost=field('Cost per unit (AUD, what it costs you) \u2014 applies to every variant', v.costCents?(v.costCents/100).toFixed(2):'');
+  var vRows=(pr.variants||[]).map(function(x){ return { id:String(x.id), title:x.title||'', sku:x.sku||'', stock:x.stock||0 }; });
+  if(!vRows.length) vRows=[{ id:String(Date.now()), title:'OSFA', sku:'', stock:0 }];
+  var vLab=document.createElement('div'); vLab.style.cssText='margin-top:14px;font-size:13px;font-weight:700;'; vLab.textContent='Variants (sizes)';
+  w.appendChild(vLab);
+  var vHint=document.createElement('div'); vHint.style.cssText='font-size:11.5px;color:#4a4e6a;margin:2px 0 6px;'; vHint.textContent='One row per size. Stock is tracked per variant.';
+  w.appendChild(vHint);
+  var vWrap=document.createElement('div'); w.appendChild(vWrap);
+  function drawVariants(){
+    vWrap.innerHTML='';
+    var head=document.createElement('div'); head.style.cssText='display:grid;grid-template-columns:1.2fr 1.4fr 80px 32px;gap:6px;font-size:11px;font-weight:700;color:#4a4e6a;margin-bottom:2px;';
+    head.innerHTML='<span>Label</span><span>SKU</span><span>Stock</span><span></span>'; vWrap.appendChild(head);
+    vRows.forEach(function(r,i){
+      var row=document.createElement('div'); row.style.cssText='display:grid;grid-template-columns:1.2fr 1.4fr 80px 32px;gap:6px;margin-bottom:6px;align-items:center;';
+      var a=document.createElement('input'); a.type='text'; a.value=r.title; a.placeholder='S / M / OSFA'; a.oninput=function(){ r.title=a.value; };
+      var b=document.createElement('input'); b.type='text'; b.value=r.sku; b.placeholder='SKU'; b.oninput=function(){ r.sku=b.value; };
+      var c=document.createElement('input'); c.type='number'; c.min='0'; c.value=String(r.stock); c.oninput=function(){ r.stock=parseInt(c.value,10)||0; };
+      [a,b,c].forEach(function(el){ el.style.cssText='padding:6px;border:1px solid #b9bdd1;box-sizing:border-box;width:100%;'; });
+      var x=document.createElement('button'); x.textContent='\u00d7'; x.title='Remove variant'; x.style.cssText='height:30px;padding:0;';
+      x.disabled=(vRows.length===1);
+      x.onclick=function(){ vRows.splice(i,1); drawVariants(); };
+      row.appendChild(a); row.appendChild(b); row.appendChild(c); row.appendChild(x); vWrap.appendChild(row);
+    });
+    var acts=document.createElement('div'); acts.style.cssText='display:flex;gap:8px;margin-top:4px;';
+    var addv=document.createElement('button'); addv.className='act'; addv.textContent='+ Add variant';
+    addv.onclick=function(){ vRows.push({ id:String(Date.now())+'_'+vRows.length, title:'', sku:'', stock:0 }); drawVariants(); };
+    var sizes=document.createElement('button'); sizes.className='act'; sizes.textContent='Add S M L XL';
+    sizes.onclick=function(){
+      var have=vRows.map(function(r){ return r.title.trim().toUpperCase(); });
+      if(vRows.length===1 && !vRows[0].title.trim()) vRows=[];
+      ['S','M','L','XL'].forEach(function(sz,k){ if(have.indexOf(sz)===-1) vRows.push({ id:String(Date.now())+'_'+k, title:sz, sku:'', stock:0 }); });
+      drawVariants();
+    };
+    acts.appendChild(addv); acts.appendChild(sizes); vWrap.appendChild(acts);
+  }
+  drawVariants();
 
   var tog=document.createElement('label'); tog.style.cssText='display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:700;';
   var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!pr.active;
@@ -4336,12 +4369,18 @@ function stEditProduct(pr){
     if(!title){ msg.textContent='Title required.'; return; }
     var priceC=Math.round(parseFloat(fPrice.value||'0')*100);
     if(!(priceC>0)){ msg.textContent='Price must be > 0.'; return; }
-    var stock=parseInt(fStock.value,10); if(!(stock>=0)) stock=0;
+    var costC=Math.round(parseFloat(fCost.value||'0')*100)||0;
+    var variants=vRows.filter(function(r){ return r.title.trim()||r.sku.trim(); }).map(function(r){
+      return { id:r.id, title:r.title.trim()||'OSFA', sku:r.sku.trim(), priceCents:priceC, costCents:costC, stock:(r.stock>=0?r.stock:0) };
+    });
+    if(!variants.length) variants=[{ id:String(Date.now()), title:'OSFA', sku:'', priceCents:priceC, costCents:costC, stock:0 }];
+    var tags=fTags.value.split(',').map(function(t){ return t.trim(); }).filter(Boolean);
     var handle=pr.handle||slugify(title);
     var doc={
       handle:handle, title:title, descriptionHtml:fDesc.value,
       active:cb.checked, images:pr.images||[],
-      variants:[{ id:v.id, title:fVar.value.trim()||'OSFA', sku:fSku.value.trim(), priceCents:priceC, costCents:Math.round(parseFloat(fCost.value||'0')*100)||0, stock:stock }],
+      tags:tags,
+      variants:variants,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     if(isNew) doc.createdAt = firebase.firestore.FieldValue.serverTimestamp();
@@ -4570,8 +4609,25 @@ function stOrderDetail(o){
   sheet.innerHTML='';
   var w=document.createElement('div'); w.className='notif-wrap';
   var a=o.shipping_address||{};
+  function findProductByVariant(vid){
+    vid=String(vid||''); var hit=null;
+    (ST.products||[]).forEach(function(pr){ (pr.variants||[]).forEach(function(v){ if(String(v.id)===vid) hit=pr; }); });
+    return hit;
+  }
   var items=(o.line_items||[]).map(function(li){
-    return '<div>'+li.title+(li.variant_title?' \u2014 '+li.variant_title:'')+' \u00d7'+li.quantity+' \u00b7 $'+li.price+'</div>';
+    var pr=findProductByVariant(li.variantId);
+    if(!pr){ (ST.products||[]).forEach(function(x){ if(!pr && x.title===li.title) pr=x; }); }
+    var img=(pr&&pr.images&&pr.images[0])?pr.images[0]:'';
+    var tags=(pr&&pr.tags&&pr.tags.length)?pr.tags:[];
+    var sz=li.variant_title||'';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #b9bdd1;">'+
+      (img?'<img src="'+img+'" style="width:52px;height:52px;object-fit:cover;border:1px solid #b9bdd1;flex:none;">':'<div style="width:52px;height:52px;border:1px solid #b9bdd1;flex:none;background:#e3e5f0;"></div>')+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-weight:700;">'+li.title+(sz?' <span style="font-weight:400;">\u2014 '+sz+'</span>':'')+'</div>'+
+        (tags.length?'<div style="margin-top:3px;">'+tags.map(function(t){ return '<span style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;padding:1px 6px;margin-right:4px;background:#1e2352;color:#fff;">'+t+'</span>'; }).join('')+'</div>':'')+
+      '</div>'+
+      '<div style="flex:none;font-size:13px;white-space:nowrap;">\u00d7'+li.quantity+' \u00b7 $'+li.price+'</div>'+
+    '</div>';
   }).join('');
   var shipLine=(o.shipping_lines&&o.shipping_lines[0])?('<div>'+o.shipping_lines[0].title+' \u00b7 $'+o.shipping_lines[0].price+'</div>'):'';
   w.innerHTML =
