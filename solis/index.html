@@ -36,6 +36,7 @@
   .logo { display: block; width: 64px; height: 64px; object-fit: contain; margin-bottom: 14px; }
   .brand { display: flex; align-items: center; gap: 12px; }
   .brand .logo { width: 44px; height: 44px; margin: 0; }
+  @media (prefers-color-scheme: dark) { .logo { filter: invert(1); } }
   .signin h1 { margin-bottom: 6px; }
   .signin p { color: var(--muted); margin: 0 0 16px; }
   input[type=email], input[type=search] { font: inherit; width: 100%; padding: 10px 12px; border-radius: 8px;
