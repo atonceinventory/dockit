@@ -537,6 +537,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .pick-card:hover{border-color:var(--line-2)}
 .pick-mark{width:56px;height:56px;border-radius:14px;overflow:hidden;background:var(--full);display:flex;align-items:center;justify-content:center}
 .pick-mark img{width:100%;height:100%;object-fit:cover}
+.pick-mark img.wide,.tile .mark img.wide,.lane-head .swatch img.wide{object-fit:contain;padding:7%;box-sizing:border-box;background:#fff}
 .pick-mark b{color:#fff;font-weight:800;font-size:17px}
 .pick-mark b.big{font-size:40px;font-weight:900;letter-spacing:-.04em;line-height:1}
 .tile .mark b.big{font-size:27px;font-weight:900;letter-spacing:-.04em;line-height:1}
@@ -1738,7 +1739,7 @@ document.getElementById('datestamp').textContent =
 function mark(l, into){
   if(S.logos[l.k]){
     var im=document.createElement('img');
-    im.src=S.logos[l.k]; im.alt=l.name;
+    im.src=S.logos[l.k]; im.alt=l.name; if(l.k==='cb') im.className='wide';
     into.appendChild(im);
   }else{
     var b=document.createElement('b'); b.textContent=l.code; if(l.k==='me') b.className='big';
@@ -2149,7 +2150,7 @@ function laneBlock(l, tasks){
   var sw=document.createElement('span'); sw.className='swatch';
   sw.style.setProperty('--full', l.full);
   if(S.logos[l.k]){
-    var si=document.createElement('img'); si.src=S.logos[l.k]; si.alt='';
+    var si=document.createElement('img'); si.src=S.logos[l.k]; si.alt=''; if(l.k==='cb') si.className='wide';
     sw.appendChild(si);
   }else{
     sw.style.background='var(--full)';
@@ -2281,7 +2282,7 @@ function renderPicker(){
     var openN = S.tasks.filter(function(t){ return t.lane===l.k && !t.done; }).length;
     var card=document.createElement('button'); card.className='pick-card'; card.style.setProperty('--full', l.full);
     var mk=document.createElement('span'); mk.className='pick-mark';
-    if(S.logos[l.k]){ var im=document.createElement('img'); im.src=S.logos[l.k]; mk.appendChild(im); }
+    if(S.logos[l.k]){ var im=document.createElement('img'); im.src=S.logos[l.k]; if(l.k==='cb') im.className='wide'; mk.appendChild(im); }
     else { var b=document.createElement('b'); b.textContent=l.code; if(l.k==='me') b.className='big'; mk.appendChild(b); }
     var nm=document.createElement('span'); nm.className='pick-name'; nm.textContent=l.name;
     var sub=document.createElement('span'); sub.className='pick-sub';
