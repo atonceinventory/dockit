@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Solis Members</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --ink: #1c1b19; --muted: #6b6862; --line: #e4e1db;
+    --accent: #1c1b19; --ok: #1f7a4d; --ok-bg: #e3f3ea; --warn: #9a5b00; --warn-bg: #fbefd9;
+    --off: #6b6862; --off-bg: #eceae6; --bad: #a3271f; --bad-bg: #f8e1df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --card: #1e1d1b; --ink: #f1efea; --muted: #a29e96; --line: #2f2d2a;
+      --accent: #f1efea; --ok: #6fd3a0; --ok-bg: #173226; --warn: #f2bb5c; --warn-bg: #3a2c12;
+      --off: #a29e96; --off-bg: #2a2926; --bad: #f08a80; --bad-bg: #3b1d1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
+  .who { color: var(--muted); font-size: 13px; }
+  button, .btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; }
+  button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  button:disabled { opacity: .6; cursor: default; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .signin { max-width: 400px; margin: 12vh auto 0; }
+  .signin h1 { margin-bottom: 6px; }
+  .signin p { color: var(--muted); margin: 0 0 16px; }
+  input[type=email], input[type=search] { font: inherit; width: 100%; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .msg { margin-top: 12px; font-size: 14px; color: var(--muted); }
+  .msg.err { color: var(--bad); }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat .n { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat .l { color: var(--muted); font-size: 13px; }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .tools input { flex: 1 1 220px; width: auto; }
+  .tab { border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+  .tab[aria-pressed=true] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td small { color: var(--muted); display: block; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .pill.active { color: var(--ok); background: var(--ok-bg); }
+  .pill.past_due { color: var(--warn); background: var(--warn-bg); }
+  .pill.cancelled, .pill.paused { color: var(--off); background: var(--off-bg); }
+  .pill.incomplete { color: var(--bad); background: var(--bad-bg); }
+  .empty { padding: 32px; text-align: center; color: var(--muted); }
+  .foot { margin-top: 16px; color: var(--muted); font-size: 13px; }
+  .foot a { color: inherit; }
+  [hidden] { display: none !important; }
+  @media (max-width: 680px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    table, thead, tbody, tr, td { display: block; }
+    thead { display: none; }
+    table { border: 0; background: none; }
+    tr { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; padding: 6px 0; }
+    td { border: 0; padding: 6px 14px; }
+    td[data-l]::before { content: attr(data-l); display: block; font-size: 11px; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--muted); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section id="signin" class="card signin" hidden>
+    <h1>Solis Members</h1>
+    <p>Enter your email and we will send you a sign-in link.</p>
+    <form id="signin-form">
+      <input id="email" type="email" required autocomplete="email" placeholder="you@solisperth.com.au">
+      <div class="row"><button class="primary" type="submit" id="send">Send sign-in link</button></div>
+    </form>
+    <div id="signin-msg" class="msg"></div>
+  </section>
+
+  <section id="app" hidden>
+    <header>
+      <div>
+        <h1>Solis Members</h1>
+        <div class="who" id="who"></div>
+      </div>
+      <button id="signout" type="button">Sign out</button>
+    </header>
+
+    <div class="stats">
+      <div class="stat"><div class="n" id="n-active">0</div><div class="l">Active</div></div>
+      <div class="stat"><div class="n" id="n-due">0</div><div class="l">Payment failed</div></div>
+      <div class="stat"><div class="n" id="n-leaving">0</div><div class="l">Cancelling</div></div>
+      <div class="stat"><div class="n" id="n-cancelled">0</div><div class="l">Cancelled</div></div>
+    </div>
+
+    <div class="tools">
+      <input id="q" type="search" placeholder="Search name, email or phone">
+      <button class="tab" data-f="current" aria-pressed="true" type="button">Current</button>
+      <button class="tab" data-f="past_due" aria-pressed="false" type="button">Payment failed</button>
+      <button class="tab" data-f="cancelled" aria-pressed="false" type="button">Cancelled</button>
+      <button class="tab" data-f="all" aria-pressed="false" type="button">All</button>
+    </div>
+
+    <table>
+      <thead><tr><th>Member</th><th>Phone</th><th>Status</th><th>Next payment</th><th>Joined</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="empty" class="empty card" hidden>No members here yet.</div>
+
+    <p class="foot">Payments, receipts and payouts are in your
+      <a href="https://dashboard.stripe.com" target="_blank" rel="noopener">Stripe dashboard</a>.</p>
+  </section>
+
+  <section id="denied" class="card signin" hidden>
+    <h1>No access</h1>
+    <p id="denied-msg">This email is not set up for the Solis members list.</p>
+    <div class="row"><button id="denied-out" type="button">Use a different email</button></div>
+  </section>
+
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, onAuthStateChanged, sendSignInLinkToEmail, isSignInWithEmailLink,
+  signInWithEmailLink, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+// solis-membership project (separate from Docket's docket-6159b). Web config is public by design;
+// access is enforced by Firestore rules (staff/<email> allowlist).
+const app = initializeApp({
+  apiKey: 'AIzaSyDtWAE1LlTEIdsro8rRV8Kzj1gYRaW4Mf4',
+  authDomain: 'solis-membership.firebaseapp.com',
+  projectId: 'solis-membership',
+  storageBucket: 'solis-membership.firebasestorage.app',
+  messagingSenderId: '341102338846',
+  appId: '1:341102338846:web:e5a64a76fba6b9e37d1f0f'
+}, 'solis');
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const $ = id => document.getElementById(id);
+const show = id => ['signin', 'app', 'denied'].forEach(s => { $(s).hidden = s !== id; });
+const EMAIL_KEY = 'solisSignInEmail';
+const store = {
+  get() { try { return localStorage.getItem(EMAIL_KEY); } catch (e) { return null; } },
+  set(v) { try { localStorage.setItem(EMAIL_KEY, v); } catch (e) {} },
+  clear() { try { localStorage.removeItem(EMAIL_KEY); } catch (e) {} }
+};
+
+// Finish sign-in when arriving from the emailed link.
+if (isSignInWithEmailLink(auth, location.href)) {
+  let email = store.get();
+  if (!email) email = prompt('Please confirm your email to finish signing in');
+  if (email) {
+    try {
+      await signInWithEmailLink(auth, email.trim(), location.href);
+      store.clear();
+    } catch (e) {
+      show('signin');
+      $('signin-msg').className = 'msg err';
+      $('signin-msg').textContent = 'That sign-in link has expired or was already used. Send a new one.';
+    }
+  }
+  history.replaceState(null, '', location.pathname);
+}
+
+$('signin-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('email').value.trim().toLowerCase();
+  $('send').disabled = true;
+  $('signin-msg').className = 'msg';
+  $('signin-msg').textContent = 'Sending…';
+  try {
+    await sendSignInLinkToEmail(auth, email, { url: location.origin + location.pathname, handleCodeInApp: true });
+    store.set(email);
+    $('signin-msg').textContent = 'Check your inbox for a link from Solis Members. You can close this tab.';
+  } catch (err) {
+    $('signin-msg').className = 'msg err';
+    $('signin-msg').textContent = 'Could not send the link. Check the email address and try again.';
+  } finally {
+    $('send').disabled = false;
+  }
+});
+
+const doSignOut = () => signOut(auth);
+$('signout').addEventListener('click', doSignOut);
+$('denied-out').addEventListener('click', doSignOut);
+
+let members = [];
+let filter = 'current';
+let unsub = null;
+
+onAuthStateChanged(auth, user => {
+  if (unsub) { unsub(); unsub = null; }
+  if (!user) { show('signin'); return; }
+  $('who').textContent = 'Signed in as ' + user.email;
+  unsub = onSnapshot(collection(db, 'members'), snap => {
+    members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    show('app');
+    render();
+  }, err => {
+    $('denied-msg').textContent = err.code === 'permission-denied'
+      ? user.email + ' is not set up for the Solis members list. Ask GMC to add you.'
+      : 'Could not load members (' + err.code + '). Try refreshing.';
+    show('denied');
+  });
+});
+
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
+  filter = b.dataset.f;
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-pressed', String(t === b)));
+  render();
+}));
+$('q').addEventListener('input', render);
+
+const toDate = v => (v && typeof v.toDate === 'function') ? v.toDate() : (v ? new Date(v) : null);
+const fmt = d => d ? d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const LABEL = { active: 'Active', past_due: 'Payment failed', cancelled: 'Cancelled', incomplete: 'Not completed', paused: 'Paused' };
+const ORDER = { past_due: 0, active: 1, incomplete: 2, paused: 3, cancelled: 4 };
+
+function render() {
+  const leaving = m => m.status === 'active' && m.cancelAtPeriodEnd;
+  $('n-active').textContent = members.filter(m => m.status === 'active' && !m.cancelAtPeriodEnd).length;
+  $('n-due').textContent = members.filter(m => m.status === 'past_due').length;
+  $('n-leaving').textContent = members.filter(leaving).length;
+  $('n-cancelled').textContent = members.filter(m => m.status === 'cancelled').length;
+
+  const q = $('q').value.trim().toLowerCase();
+  const list = members
+    .filter(m => filter === 'all' ? true
+      : filter === 'current' ? (m.status === 'active' || m.status === 'past_due')
+      : m.status === filter)
+    .filter(m => !q || [m.name, m.email, m.phone].some(v => (v || '').toLowerCase().includes(q)))
+    .sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9) || (a.name || a.email || '').localeCompare(b.name || b.email || ''));
+
+  $('rows').innerHTML = list.map(m => {
+    const end = toDate(m.currentPeriodEnd);
+    let next = fmt(end);
+    if (m.status === 'cancelled') next = 'Ended ' + fmt(toDate(m.endedAt) || end);
+    else if (leaving(m)) next = 'Leaves ' + fmt(end);
+    const amount = m.amountCents ? '<small>$' + (m.amountCents / 100).toFixed(2) + ' / fortnight</small>' : '';
+    const status = leaving(m) ? 'Cancelling' : (LABEL[m.status] || m.status);
+    return '<tr>' +
+      '<td data-l="Member"><strong>' + esc(m.name || '(no name)') + '</strong><small>' + esc(m.email) + '</small></td>' +
+      '<td data-l="Phone">' + esc(m.phone || '—') + '</td>' +
+      '<td data-l="Status"><span class="pill ' + esc(leaving(m) ? 'paused' : m.status) + '">' + esc(status) + '</span></td>' +
+      '<td data-l="Next payment">' + esc(next) + amount + '</td>' +
+      '<td data-l="Joined">' + esc(fmt(toDate(m.joinedAt))) + '</td>' +
+      '</tr>';
+  }).join('');
+  $('empty').hidden = list.length > 0;
+  document.querySelector('table').hidden = list.length === 0;
+}
+</script>
+</body>
+</html>
