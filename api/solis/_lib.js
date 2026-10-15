@@ -11,6 +11,11 @@
 //   SOLIS_SUCCESS_URL            page members land on after paying (Squarespace welcome page)
 //   SOLIS_CANCEL_URL             page members return to if they back out (Squarespace membership page)
 //   SOLIS_FIREBASE_SA            service account JSON for the solis-membership Firebase project (raw JSON or base64)
+//   SOLIS_PRIVACY_URL            (optional) Solis privacy policy page, linked on the checkout page
+//   SOLIS_TERMS_URL              (optional) Solis membership terms page, linked on the checkout page
+//   SOLIS_REQUIRE_TERMS          (optional) "1" = member must tick to accept terms (needs a Terms URL in Dom's Stripe public details)
+//   SOLIS_RETENTION_DAYS         (optional) days to keep cancelled members before deletion, default 730
+//   CRON_SECRET                  secret Vercel sends to /api/solis/cleanup
 
 import crypto from 'node:crypto';
 
@@ -214,6 +219,34 @@ export async function fsGet(path) {
   if (!res.ok) throw new Error('Firestore read ' + path + ' failed: ' + res.status + ' ' + (await res.text()));
   const doc = await res.json();
   return fromFields(doc.fields);
+}
+
+// Returns [{ id, data }] for documents in a collection where field == value.
+export async function fsWhereEqual(collection, field, value) {
+  const sa = serviceAccount();
+  const parent = 'projects/' + sa.project_id + '/databases/(default)/documents';
+  const res = await fetch('https://firestore.googleapis.com/v1/' + parent + ':runQuery', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + (await googleToken()), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: {
+      from: [{ collectionId: collection }],
+      where: { fieldFilter: { field: { fieldPath: field }, op: 'EQUAL', value: toValue(value) } }
+    } })
+  });
+  if (!res.ok) throw new Error('Firestore query failed: ' + res.status + ' ' + (await res.text()));
+  const rows = await res.json();
+  return rows.filter(function (r) { return r.document; }).map(function (r) {
+    return { id: r.document.name.split('/').pop(), data: fromFields(r.document.fields) };
+  });
+}
+
+export async function fsDelete(path) {
+  const res = await fetch(docUrl(path), {
+    method: 'DELETE',
+    headers: { Authorization: 'Bearer ' + (await googleToken()) }
+  });
+  if (!res.ok && res.status !== 404) throw new Error('Firestore delete ' + path + ' failed: ' + res.status);
+  return true;
 }
 
 // ---------- Small HTTP helpers ----------
