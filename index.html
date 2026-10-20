@@ -539,6 +539,10 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .pick-mark img{width:100%;height:100%;object-fit:cover}
 .pick-mark img.wide,.tile .mark img.wide,.lane-head .swatch img.wide{object-fit:contain;padding:7%;box-sizing:border-box;background:#fff}
 .pick-mark b{color:#fff;font-weight:800;font-size:17px}
+.st-drop{margin-top:10px;padding:22px 14px;border:2px dashed #6a6d82;background:rgba(255,255,255,.35);text-align:center;cursor:pointer;display:flex;flex-direction:column;gap:3px;align-items:center}
+.st-drop b{font-size:14px}
+.st-drop span{font-size:12px;color:#4a4e6a}
+.st-drop.over{border-color:var(--pit);background:var(--pit-t)}
 .pick-mark b.big{font-size:40px;font-weight:900;letter-spacing:-.04em;line-height:1}
 .tile .mark b.big{font-size:27px;font-weight:900;letter-spacing:-.04em;line-height:1}
 .pick-name{font-size:15px;font-weight:600}
@@ -4343,6 +4347,22 @@ function stRenderProducts(body){
   body.appendChild(grid);
 }
 
+/* description: edit as plain text, store as simple HTML so the storefront is unchanged */
+function stHtmlToPlain(h){
+  if(!h) return '';
+  var t=String(h);
+  t=t.replace(/<meta[^>]*>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<script[\s\S]*?<\/script>/gi,'');
+  t=t.replace(/<br\s*\/?>/gi,'\n').replace(/<\/(p|div|li|h[1-6]|tr)>/gi,'\n\n').replace(/<li[^>]*>/gi,'- ');
+  t=t.replace(/<[^>]+>/g,'');
+  var ta=document.createElement('textarea'); ta.innerHTML=t; t=ta.value;
+  return t.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+function stPlainToHtml(t){
+  t=(t||'').replace(/\r/g,'').trim(); if(!t) return '';
+  function esc(x){ return x.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  return t.split(/\n{2,}/).map(function(par){ return '<p>'+esc(par).replace(/\n/g,'<br>')+'</p>'; }).join('\n');
+}
+
 function stEditProduct(pr){
   ST.sub='editor';
   var isNew = !pr;
@@ -4365,7 +4385,7 @@ function stEditProduct(pr){
     return i;
   }
   var fTitle=field('Title', pr.title);
-  var fDesc=field('Description (HTML ok)', pr.descriptionHtml, 'area');
+  var fDesc=field('Description', stHtmlToPlain(pr.descriptionHtml), 'area'); fDesc.placeholder='Plain text. Blank line = new paragraph.';
   var fTags=field('Tags (comma separated, e.g. plaid, red, cap)', (pr.tags||[]).join(', '));
   var fPrice=field('Price (AUD, e.g. 69.95) \u2014 applies to every variant', v.priceCents?(v.priceCents/100).toFixed(2):'');
   var fCost=field('Cost per unit (AUD, what it costs you) \u2014 applies to every variant', v.costCents?(v.costCents/100).toFixed(2):'');
@@ -4447,12 +4467,24 @@ function stEditProduct(pr){
   w.appendChild(imgsWrap);
   w.appendChild(imgHint);
 
-  var up=document.createElement('input'); up.type='file'; up.accept='image/*'; up.multiple=true; up.style.marginTop='8px';
+  var up=document.createElement('input'); up.type='file'; up.accept='image/*'; up.multiple=true; up.style.display='none';
   var upMsg=document.createElement('div'); upMsg.style.cssText='font-size:12px;margin-top:4px;';
-  up.onchange=function(){
+  var zone=document.createElement('div'); zone.className='st-drop';
+  zone.innerHTML='<b>Drop photos here</b><span>or click to choose. Several at once is fine.</span>';
+  zone.onclick=function(){ up.click(); };
+  zone.ondragover=function(e){ if(dragFrom!==null) return; e.preventDefault(); zone.classList.add('over'); };
+  zone.ondragleave=function(){ zone.classList.remove('over'); };
+  zone.ondrop=function(e){
+    if(dragFrom!==null) return;
+    e.preventDefault(); zone.classList.remove('over');
+    var fl=Array.prototype.slice.call((e.dataTransfer&&e.dataTransfer.files)||[]).filter(function(f){ return /^image\//.test(f.type); });
+    if(fl.length) uploadFiles(fl);
+  };
+  up.onchange=function(){ uploadFiles(Array.prototype.slice.call(up.files||[])); };
+  function uploadFiles(files){
     var handle = pr.handle || slugify(fTitle.value);
-    var files=Array.prototype.slice.call(up.files||[]);
     if(!files.length) return;
+    upMsg.textContent='Uploading '+files.length+' photo'+(files.length>1?'s':'')+'\u2026';
     upMsg.textContent='Uploading\u2026';
     var chain=Promise.resolve();
     files.forEach(function(f){
@@ -4471,8 +4503,8 @@ function stEditProduct(pr){
     });
     chain.then(function(){ upMsg.textContent='Uploaded.'; up.value=''; drawImgs(); })
          .catch(function(e){ upMsg.textContent='Upload failed: '+(e.message||e); });
-  };
-  w.appendChild(up); w.appendChild(upMsg);
+  }
+  w.appendChild(zone); w.appendChild(up); w.appendChild(upMsg);
 
   var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-top:16px;';
   var save=document.createElement('button'); save.className='gmc-red'; save.textContent='Save';
@@ -4492,7 +4524,7 @@ function stEditProduct(pr){
     var tags=fTags.value.split(',').map(function(t){ return t.trim(); }).filter(Boolean);
     var handle=pr.handle||slugify(title);
     var doc={
-      handle:handle, title:title, descriptionHtml:fDesc.value,
+      handle:handle, title:title, descriptionHtml:stPlainToHtml(fDesc.value),
       active:cb.checked, images:pr.images||[],
       tags:tags,
       variants:variants,
