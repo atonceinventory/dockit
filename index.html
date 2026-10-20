@@ -4247,6 +4247,14 @@ function stResizeImage(file, maxDim, cb, onErr){
   };
   img.src=URL.createObjectURL(file);
 }
+var ST_BUCKET='docket-6159b.firebasestorage.app';
+function stPublicUrl(path){ return 'https://firebasestorage.googleapis.com/v0/b/'+ST_BUCKET+'/o/'+encodeURIComponent(path)+'?alt=media'; }
+/* older rows point at storage.googleapis.com, which the bucket does not serve publicly */
+function stFixUrl(u){
+  var pre='https://storage.googleapis.com/'+ST_BUCKET+'/';
+  if(typeof u==='string' && u.indexOf(pre)===0) return stPublicUrl(u.slice(pre.length));
+  return u;
+}
 function slugify(t){ return String(t||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || ('product-'+Date.now()); }
 
 function stLoad(cb){
@@ -4256,6 +4264,10 @@ function stLoad(cb){
     fbDb.collection('pit_orders').orderBy('order_number','desc').limit(50).get()
   ]).then(function(res){
     ST.products = res[0].docs.map(function(d){ return d.data(); });
+    ST.products.forEach(function(pr){
+      var fixed=(pr.images||[]).map(stFixUrl);
+      if(fixed.join('\n')!==(pr.images||[]).join('\n')){ pr.images=fixed; if(pr.handle) fbDb.collection('pit_products').doc(pr.handle).set({ images:fixed },{merge:true}); }
+    });
     ST.orders = res[1].docs.map(function(d){ return d.data(); });
     ST_UNFUL = ST.orders.filter(function(o){ return o.status==='paid'; }).length;
     cb(null);
@@ -4502,7 +4514,7 @@ function stEditProduct(pr){
             var path='pit/products/'+handle+'/'+Date.now()+'-'+Math.floor(Math.random()*1e4)+'.'+ext;
             firebase.storage().ref(path).put(blob, { cacheControl:'public,max-age=31536000,immutable' }).then(function(){
               pr.images=pr.images||[];
-              pr.images.push('https://storage.googleapis.com/docket-6159b.firebasestorage.app/'+path);
+              pr.images.push(stPublicUrl(path));
               resolve();
             }).catch(reject);
           }, reject);
