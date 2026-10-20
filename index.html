@@ -4251,9 +4251,13 @@ var ST_BUCKET='docket-6159b.firebasestorage.app';
 function stPublicUrl(path){ return 'https://firebasestorage.googleapis.com/v0/b/'+ST_BUCKET+'/o/'+encodeURIComponent(path)+'?alt=media'; }
 /* older rows point at storage.googleapis.com, which the bucket does not serve publicly */
 function stFixUrl(u){
-  var pre='https://storage.googleapis.com/'+ST_BUCKET+'/';
-  if(typeof u==='string' && u.indexOf(pre)===0) return stPublicUrl(u.slice(pre.length));
-  return u;
+  if(typeof u!=='string') return u;
+  var path=null, m;
+  if((m=u.match(/^https:\/\/storage\.googleapis\.com\/docket-6159b\.firebasestorage\.app\/([^#]+)/))) path=m[1];
+  else if((m=u.match(/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/docket-6159b\.firebasestorage\.app\/o\/([^?#]+)/))){ try{ path=decodeURIComponent(m[1]); }catch(e){ path=m[1]; } }
+  if(!path) return u;
+  path=path.replace(/\?.*$/,'');   // migrated links carried ?v=2 cache-busters; never part of the file name
+  return stPublicUrl(path);
 }
 function slugify(t){ return String(t||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || ('product-'+Date.now()); }
 
@@ -4513,9 +4517,10 @@ function stEditProduct(pr){
           stResizeImage(f, 1400, function(blob, ext){
             var path='pit/products/'+handle+'/'+Date.now()+'-'+Math.floor(Math.random()*1e4)+'.'+ext;
             firebase.storage().ref(path).put(blob, { cacheControl:'public,max-age=31536000,immutable' }).then(function(){
-              pr.images=pr.images||[];
-              pr.images.push(stPublicUrl(path));
-              resolve();
+              var u=stPublicUrl(path), im=new Image();
+              im.onload=function(){ pr.images=pr.images||[]; pr.images.push(u); resolve(); };
+              im.onerror=function(){ reject(new Error('Uploaded '+f.name+' but it cannot be loaded back, so it was not added.')); };
+              im.src=u;
             }).catch(reject);
           }, reject);
         });
