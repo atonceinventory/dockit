@@ -4230,17 +4230,21 @@ var ST_CARRIERS = {
   'DHL':     'https://www.dhl.com/au-en/home/tracking.html?tracking-id={N}',
   'Hand Deliver': ''
 };
-function stResizeImage(file, maxDim, cb){
+function stResizeImage(file, maxDim, cb, onErr){
+  var webOk=/^image\/(jpeg|png|webp|gif)$/i.test(file.type||'');
   var img=new Image();
   img.onload=function(){
     var w=img.width, h=img.height;
-    if(w<=maxDim && h<=maxDim && file.size < 400*1024){ cb(file, (file.name.split('.').pop()||'jpg')); return; }
+    if(webOk && w<=maxDim && h<=maxDim && file.size < 400*1024){ cb(file, (file.name.split('.').pop()||'jpg').toLowerCase()); return; }
     var scale=Math.min(maxDim/w, maxDim/h, 1);
     var c=document.createElement('canvas'); c.width=Math.round(w*scale); c.height=Math.round(h*scale);
     c.getContext('2d').drawImage(img,0,0,c.width,c.height);
     c.toBlob(function(b){ cb(b||file, 'jpg'); }, 'image/jpeg', 0.85);
   };
-  img.onerror=function(){ cb(file, (file.name.split('.').pop()||'jpg')); };
+  img.onerror=function(){
+    var e=new Error('Cannot read '+file.name+' (HEIC or unsupported). Export it as JPG or PNG and try again.');
+    if(onErr) onErr(e); else cb(file, (file.name.split('.').pop()||'jpg').toLowerCase());
+  };
   img.src=URL.createObjectURL(file);
 }
 function slugify(t){ return String(t||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || ('product-'+Date.now()); }
@@ -4436,7 +4440,11 @@ function stEditProduct(pr){
   var dragFrom=null;
   function moveImg(from,to){
     if(from===to||from<0||to<0||from>=pr.images.length||to>=pr.images.length) return;
-    var it=pr.images.splice(from,1)[0]; pr.images.splice(to,0,it); drawImgs();
+    var it=pr.images.splice(from,1)[0]; pr.images.splice(to,0,it); drawImgs(); persistImgs();
+  }
+  function persistImgs(){
+    if(!pr.handle) return Promise.resolve(false);
+    return fbDb.collection('pit_products').doc(pr.handle).set({ images: pr.images||[] },{merge:true}).then(function(){ return true; });
   }
   function drawImgs(){
     imgsWrap.innerHTML='';
@@ -4446,7 +4454,7 @@ function stEditProduct(pr){
       if(i===0){ var mn=document.createElement('span'); mn.textContent='MAIN'; mn.style.cssText='position:absolute;left:0;bottom:0;font-size:9px;font-weight:700;letter-spacing:.06em;background:var(--pit,#3b45c7);color:#fff;padding:2px 5px;'; d.appendChild(mn); }
       var x=document.createElement('button'); x.textContent='\u00d7'; x.title='Remove';
       x.style.cssText='position:absolute;top:-6px;right:-6px;width:20px;height:20px;line-height:1;padding:0;';
-      x.onclick=function(e){ e.stopPropagation(); pr.images.splice(i,1); drawImgs(); };
+      x.onclick=function(e){ e.stopPropagation(); pr.images.splice(i,1); drawImgs(); persistImgs(); };
       d.appendChild(x);
       var nb=document.createElement('div'); nb.style.cssText='display:flex;justify-content:space-between;margin-top:3px;';
       var lb=document.createElement('button'); lb.textContent='\u25c0'; lb.title='Move left'; lb.disabled=(i===0);
@@ -4497,12 +4505,13 @@ function stEditProduct(pr){
               pr.images.push('https://storage.googleapis.com/docket-6159b.firebasestorage.app/'+path);
               resolve();
             }).catch(reject);
-          });
+          }, reject);
         });
       });
     });
-    chain.then(function(){ upMsg.textContent='Uploaded.'; up.value=''; drawImgs(); })
-         .catch(function(e){ upMsg.textContent='Upload failed: '+(e.message||e); });
+    chain.then(function(){ up.value=''; drawImgs(); return persistImgs(); })
+         .then(function(saved){ upMsg.textContent = saved ? 'Uploaded and saved.' : 'Uploaded. Hit Save to keep it.'; })
+         .catch(function(e){ upMsg.textContent='Upload failed: '+(e.message||e); up.value=''; drawImgs(); });
   }
   w.appendChild(zone); w.appendChild(up); w.appendChild(upMsg);
 
