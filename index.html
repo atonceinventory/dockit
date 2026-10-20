@@ -4239,7 +4239,9 @@ function stResizeImage(file, maxDim, cb, onErr){
     var scale=Math.min(maxDim/w, maxDim/h, 1);
     var c=document.createElement('canvas'); c.width=Math.round(w*scale); c.height=Math.round(h*scale);
     c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-    c.toBlob(function(b){ cb(b||file, 'jpg'); }, 'image/jpeg', 0.85);
+    var alpha=/png|webp|gif/i.test(file.type||'');   // keep transparency: JPEG would paint it black
+    if(alpha){ c.toBlob(function(b){ if(b){ cb(b,'webp'); } else { c.toBlob(function(b2){ cb(b2||file,'png'); }, 'image/png'); } }, 'image/webp', 0.85); }
+    else { c.toBlob(function(b){ cb(b||file, 'jpg'); }, 'image/jpeg', 0.85); }
   };
   img.onerror=function(){
     var e=new Error('Cannot read '+file.name+' (HEIC or unsupported). Export it as JPG or PNG and try again.');
