@@ -2342,7 +2342,7 @@ function renderPicker(){
     var sub=document.createElement('span'); sub.className='pick-sub';
     sub.textContent = openN + ' open' + ((l.k==='gmc'||l.k==='cb') ? ' \u00b7 projects \u00b7 alerts' : '');
     card.appendChild(mk); card.appendChild(nm); card.appendChild(sub);
-    card.onclick=function(){ hub=l.k; S.page=(l.k==='gmc'?'finance':'tasks'); try{ sessionStorage.setItem('dockit_hub',l.k); }catch(e){} render(); window.scrollTo(0,0); };
+    card.onclick=function(){ hub=l.k; S.page='tasks'; try{ sessionStorage.setItem('dockit_hub',l.k); }catch(e){} render(); window.scrollTo(0,0); };
     grid.appendChild(card);
   });
   wrap.appendChild(grid);
@@ -3577,7 +3577,7 @@ function render(){
 
   // per-business tabs
   var TABS = {
-    gmc: [['finance','Finance']].concat(hubTabs()),
+    gmc: [hubTabs()[0],['finance','Finance']].concat(hubTabs().slice(1)),
     cb: hubTabs(),
     me:[['tasks','To-do'],['jot','Jot'],['calendar','Calendar']],
     pit:[['tasks','Tasks'],['grid','Grid'],['store','Store'+(ST_UNFUL?' <span style="background:#a32222;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;">'+ST_UNFUL+'</span>':'')]]
