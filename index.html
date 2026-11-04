@@ -539,6 +539,54 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .pick-mark img{width:100%;height:100%;object-fit:cover}
 .pick-mark img.wide,.tile .mark img.wide,.lane-head .swatch img.wide{object-fit:contain;padding:7%;box-sizing:border-box;background:#fff}
 .pick-mark b{color:#fff;font-weight:800;font-size:17px}
+/* ── GMC Finance ── */
+.fin{max-width:1100px;margin:14px auto 40px;padding:0 var(--pad)}
+.fin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.fin-head h2{font-size:20px;font-weight:800;margin:0}
+.fin-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.fin-tools .act{font-size:12px;padding:6px 10px;text-decoration:none;display:inline-block}
+.fin-upd{font-family:var(--mono);font-size:11px;color:var(--fg-mut);margin:6px 0 0;letter-spacing:.03em}
+.fin-warn{margin-top:12px;padding:10px 12px;background:rgba(163,34,34,.12);border:1px solid #a32222;font-size:13px;line-height:1.5}
+.fin-warn code{font-family:var(--mono);font-size:12px;background:rgba(255,255,255,.5);padding:1px 5px}
+.fin-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.fin-tile{background:var(--surface);border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;box-shadow:3px 3px 0 rgba(20,22,50,.2);padding:12px 14px;border-left:6px solid var(--gmc)}
+.fin-tile.clips{border-left-color:#3b45c7}
+.fin-tile.blanks{border-left-color:#ffffff}
+.fin-tile.exp{border-left-color:#a32222}
+.fin-tile.pos{border-left-color:#1e7a3c}
+.fin-tile.neg{border-left-color:#a32222}
+.fin-tl{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-mut)}
+.fin-tv{font-size:24px;font-weight:800;margin-top:4px;letter-spacing:-.01em}
+.fin-tile.neg .fin-tv{color:#a32222}
+.fin-ts{font-size:11.5px;color:var(--fg-mut);margin-top:3px}
+.fin-charts{display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:10px}
+.fin-card{background:var(--surface);border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;box-shadow:3px 3px 0 rgba(20,22,50,.2);padding:14px;margin-top:10px;min-width:0}
+.fin-charts .fin-card{margin-top:0}
+.fin-ch{font-weight:800;font-size:14px;margin-bottom:8px}
+.fin-dwrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.fin-donut{width:170px;height:170px;flex:none}
+.fin-donut-n{font-size:20px;font-weight:800;fill:var(--fg)}
+.fin-donut-l{font-size:10px;fill:var(--fg-mut);letter-spacing:.08em;text-transform:uppercase}
+.fin-legend{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.fin-legend-row{flex-direction:row;flex-wrap:wrap;gap:14px;margin-top:6px;font-size:12px}
+.fin-sw{display:inline-block;width:12px;height:12px;border:1px solid #1c1f4a;margin-right:6px;vertical-align:-1px}
+.fin-pc{color:var(--fg-mut);font-size:11px}
+.fin-cols{width:100%;height:auto;display:block}
+.fin-grid{stroke:rgba(30,35,82,.14);stroke-width:1}
+.fin-axis{font-size:10px;fill:var(--fg-mut);font-family:var(--mono)}
+.fin-table{width:100%;border-collapse:collapse;font-size:13px}
+.fin-table th,.fin-table td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.fin-table th:first-child,.fin-table td:first-child{text-align:left}
+.fin-table thead th{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-mut);font-weight:700}
+.fin-table tbody th{font-weight:700}
+.fin-owe{color:#a32222;font-weight:700}
+@media (max-width:720px){
+  .fin-tiles{grid-template-columns:repeat(2,1fr)}
+  .fin-tv{font-size:20px}
+  .fin-charts{grid-template-columns:1fr}
+  .fin-card{overflow-x:auto}
+}
+
 #nav{display:none!important}
 .st-drop{margin-top:10px;padding:22px 14px;border:2px dashed #6a6d82;background:rgba(255,255,255,.35);text-align:center;cursor:pointer;display:flex;flex-direction:column;gap:3px;align-items:center}
 .st-drop b{font-size:14px}
@@ -2294,7 +2342,7 @@ function renderPicker(){
     var sub=document.createElement('span'); sub.className='pick-sub';
     sub.textContent = openN + ' open' + ((l.k==='gmc'||l.k==='cb') ? ' \u00b7 projects \u00b7 alerts' : '');
     card.appendChild(mk); card.appendChild(nm); card.appendChild(sub);
-    card.onclick=function(){ hub=l.k; S.page='tasks'; try{ sessionStorage.setItem('dockit_hub',l.k); }catch(e){} render(); window.scrollTo(0,0); };
+    card.onclick=function(){ hub=l.k; S.page=(l.k==='gmc'?'finance':'tasks'); try{ sessionStorage.setItem('dockit_hub',l.k); }catch(e){} render(); window.scrollTo(0,0); };
     grid.appendChild(card);
   });
   wrap.appendChild(grid);
@@ -3169,6 +3217,171 @@ function freshContactDraft(){ var k=(typeof S!=='undefined'&&S&&S.lane)||'gmc'; 
 var contactDraft=freshContactDraft();
 var contactEditId=null;
 
+/* ═══ GMC Finance (home) — sheet + Stripe clips via /api/gmc/finance ═══ */
+var FIN = { data:null, at:0, loading:false, error:null, fy:null };
+var FIN_COL = { service:'#e9ce5c', blanks:'#ffffff', clips:'#3b45c7', expenses:'#a32222' };
+var FIN_LAB = { service:'Income', blanks:'Blanks', clips:'Stripe clips', expenses:'Expenses' };
+function finMoney(x, dp){ var n=Number(x)||0; var s=Math.abs(n).toLocaleString('en-AU',{minimumFractionDigits:(dp===undefined?0:dp),maximumFractionDigits:(dp===undefined?0:dp)}); return (n<0?'-$':'$')+s; }
+function finLoad(force){
+  if(FIN.loading) return;
+  if(!force && FIN.data && Date.now()-FIN.at < 5*60*1000) return;
+  if(!fbUser){ FIN.error='Sign in to see finance.'; render(); return; }
+  FIN.loading=true; FIN.error=null; render();
+  fbUser.getIdToken().then(function(t){
+    return fetch('/api/gmc/finance'+(FIN.fy?'?fy='+FIN.fy:''), { headers:{ Authorization:'Bearer '+t } });
+  }).then(function(r){ return r.json().then(function(d){ if(!r.ok||!d.ok) throw new Error(d.error||('HTTP '+r.status)); return d; }); })
+  .then(function(d){ FIN.data=d; FIN.at=Date.now(); FIN.loading=false; render(); })
+  .catch(function(e){ FIN.loading=false; FIN.error=e.message||String(e); render(); });
+}
+function finDonut(parts){
+  var total=parts.reduce(function(a,p){ return a+Math.max(0,p.v); },0);
+  var NS='http://www.w3.org/2000/svg', svg=document.createElementNS(NS,'svg');
+  svg.setAttribute('viewBox','0 0 200 200'); svg.setAttribute('class','fin-donut');
+  var R=80, r=50, cx=100, cy=100, a0=-Math.PI/2;
+  if(!total){ var c=document.createElementNS(NS,'circle'); c.setAttribute('cx',cx); c.setAttribute('cy',cy); c.setAttribute('r',(R+r)/2); c.setAttribute('fill','none'); c.setAttribute('stroke','rgba(30,35,82,.18)'); c.setAttribute('stroke-width',R-r); svg.appendChild(c); }
+  parts.forEach(function(p){
+    var v=Math.max(0,p.v); if(!v) return;
+    var a1=a0+2*Math.PI*v/total;
+    if(v===total){ var cc=document.createElementNS(NS,'circle'); cc.setAttribute('cx',cx); cc.setAttribute('cy',cy); cc.setAttribute('r',(R+r)/2); cc.setAttribute('fill','none'); cc.setAttribute('stroke',p.c); cc.setAttribute('stroke-width',R-r); svg.appendChild(cc); a0=a1; return; }
+    var large=(a1-a0)>Math.PI?1:0;
+    var x0=cx+R*Math.cos(a0), y0=cy+R*Math.sin(a0), x1=cx+R*Math.cos(a1), y1=cy+R*Math.sin(a1);
+    var xi0=cx+r*Math.cos(a1), yi0=cy+r*Math.sin(a1), xi1=cx+r*Math.cos(a0), yi1=cy+r*Math.sin(a0);
+    var d='M'+x0+' '+y0+' A'+R+' '+R+' 0 '+large+' 1 '+x1+' '+y1+' L'+xi0+' '+yi0+' A'+r+' '+r+' 0 '+large+' 0 '+xi1+' '+yi1+' Z';
+    var path=document.createElementNS(NS,'path'); path.setAttribute('d',d); path.setAttribute('fill',p.c); path.setAttribute('stroke','#1c1f4a'); path.setAttribute('stroke-width','1.5');
+    var t=document.createElementNS(NS,'title'); t.textContent=p.l+': '+finMoney(v)+' ('+Math.round(100*v/total)+'%)'; path.appendChild(t);
+    svg.appendChild(path); a0=a1;
+  });
+  var tx=document.createElementNS(NS,'text'); tx.setAttribute('x',cx); tx.setAttribute('y',cy-2); tx.setAttribute('text-anchor','middle'); tx.setAttribute('class','fin-donut-n'); tx.textContent=finMoney(total);
+  var tx2=document.createElementNS(NS,'text'); tx2.setAttribute('x',cx); tx2.setAttribute('y',cy+16); tx2.setAttribute('text-anchor','middle'); tx2.setAttribute('class','fin-donut-l'); tx2.textContent='income';
+  svg.appendChild(tx); svg.appendChild(tx2);
+  return svg;
+}
+function finColumns(months){
+  var NS='http://www.w3.org/2000/svg', mob=window.matchMedia('(max-width:720px)').matches, W=mob?400:720, H=mob?200:220, padL=mob?38:46, padB=26, padT=10, n=months.length;
+  var max=0; months.forEach(function(m){ max=Math.max(max, m.service+m.blanks+m.clips, m.expenses); });
+  if(!max) max=100;
+  var nice=Math.pow(10,Math.floor(Math.log10(max))); var step=nice*(max/nice>5?2:(max/nice>2?1:0.5)); var top=Math.ceil(max/step)*step;
+  var svg=document.createElementNS(NS,'svg'); svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.setAttribute('class','fin-cols');
+  var plotW=W-padL-8, plotH=H-padT-padB, slot=plotW/n, bw=slot*0.46, gap=slot*0.06;
+  function y(v){ return padT+plotH-(v/top)*plotH; }
+  for(var g=0; g<=top; g+=step){
+    var ln=document.createElementNS(NS,'line'); ln.setAttribute('x1',padL); ln.setAttribute('x2',W-8); ln.setAttribute('y1',y(g)); ln.setAttribute('y2',y(g)); ln.setAttribute('class','fin-grid'); svg.appendChild(ln);
+    var tl=document.createElementNS(NS,'text'); tl.setAttribute('x',padL-6); tl.setAttribute('y',y(g)+4); tl.setAttribute('text-anchor','end'); tl.setAttribute('class','fin-axis'); tl.textContent=g>=1000?('$'+(g/1000)+'k'):('$'+g); svg.appendChild(tl);
+  }
+  months.forEach(function(m,i){
+    var x=padL+i*slot+slot*0.5-bw-gap/2, acc=0;
+    ['service','blanks','clips'].forEach(function(k){
+      var v=m[k]; if(!(v>0)) return;
+      var rc=document.createElementNS(NS,'rect'); rc.setAttribute('x',x); rc.setAttribute('y',y(acc+v)); rc.setAttribute('width',bw); rc.setAttribute('height',Math.max(1,y(acc)-y(acc+v)));
+      rc.setAttribute('fill',FIN_COL[k]); rc.setAttribute('stroke','#1c1f4a'); rc.setAttribute('stroke-width','1');
+      var t=document.createElementNS(NS,'title'); t.textContent=m.label+' '+FIN_LAB[k]+': '+finMoney(v); rc.appendChild(t);
+      svg.appendChild(rc); acc+=v;
+    });
+    if(m.expenses>0){
+      var ex=document.createElementNS(NS,'rect'); ex.setAttribute('x',x+bw+gap); ex.setAttribute('y',y(m.expenses)); ex.setAttribute('width',bw*0.55); ex.setAttribute('height',Math.max(1,y(0)-y(m.expenses)));
+      ex.setAttribute('fill',FIN_COL.expenses); ex.setAttribute('stroke','#1c1f4a'); ex.setAttribute('stroke-width','1');
+      var te=document.createElementNS(NS,'title'); te.textContent=m.label+' expenses: '+finMoney(m.expenses); ex.appendChild(te);
+      svg.appendChild(ex);
+    }
+    var lb=document.createElementNS(NS,'text'); lb.setAttribute('x',padL+i*slot+slot*0.5); lb.setAttribute('y',H-8); lb.setAttribute('text-anchor','middle'); lb.setAttribute('class','fin-axis'); lb.textContent=m.label.split(' ')[0]; svg.appendChild(lb);
+  });
+  return svg;
+}
+function renderFinance(){
+  sheet.innerHTML='';
+  var w=document.createElement('div'); w.className='fin';
+  var d=FIN.data;
+  var head=document.createElement('div'); head.className='fin-head';
+  var h2=document.createElement('h2'); h2.textContent='GMC Finance'+(d?' · '+d.fy.label:''); head.appendChild(h2);
+  var tools=document.createElement('div'); tools.className='fin-tools';
+  if(d){
+    var fyb=document.createElement('button'); fyb.className='act'; fyb.textContent='‹ FY'+(d.fy.year-1)+'-'+String(d.fy.year).slice(2);
+    fyb.onclick=function(){ FIN.fy=d.fy.year-1; FIN.data=null; finLoad(true); };
+    var fyn=document.createElement('button'); fyn.className='act'; fyn.textContent='FY'+(d.fy.year+1)+'-'+String(d.fy.year+2).slice(2)+' ›';
+    fyn.onclick=function(){ FIN.fy=d.fy.year+1; FIN.data=null; finLoad(true); };
+    tools.appendChild(fyb); tools.appendChild(fyn);
+    var sh=document.createElement('a'); sh.className='act'; sh.href=d.sheet.url; sh.target='_blank'; sh.rel='noopener'; sh.textContent='Open sheet'; tools.appendChild(sh);
+  }
+  var rf=document.createElement('button'); rf.className='act'; rf.textContent=FIN.loading?'Loading…':'Refresh'; rf.disabled=FIN.loading; rf.onclick=function(){ finLoad(true); };
+  tools.appendChild(rf);
+  head.appendChild(tools); w.appendChild(head);
+  if(d){ var up=document.createElement('div'); up.className='fin-upd'; up.textContent='Updated '+new Date(FIN.at).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+(d.stripe.ok&&d.stripe.activeMembers!=null?' · '+d.stripe.activeMembers+' active '+d.stripe.client+' member'+(d.stripe.activeMembers===1?'':'s'):''); w.appendChild(up); }
+
+  if(FIN.error){ var er=document.createElement('div'); er.className='fin-warn'; er.textContent=FIN.error; w.appendChild(er); }
+  if(d && (!d.sheet.ok || !d.stripe.ok)){
+    var wn=document.createElement('div'); wn.className='fin-warn';
+    if(!d.sheet.ok){ wn.appendChild(document.createTextNode('Sheet not loaded: '+(d.sheet.error||'unknown')+'. ')); if(d.sheet.saEmail){ wn.appendChild(document.createTextNode('Share the finance sheet (Viewer) with: ')); var em=document.createElement('code'); em.textContent=d.sheet.saEmail; wn.appendChild(em); } }
+    if(!d.stripe.ok){ wn.appendChild(document.createElement('br')); wn.appendChild(document.createTextNode('Stripe clips not loaded: '+(d.stripe.error||'unknown'))); }
+    w.appendChild(wn);
+  }
+  if(!d){
+    if(!FIN.loading && !FIN.error){ var p=document.createElement('p'); p.className='fin-upd'; p.textContent='Loading finance…'; w.appendChild(p); }
+    sheet.appendChild(w); if(!FIN.loading && !FIN.error) finLoad(false); return;
+  }
+
+  var t=d.totals;
+  function tile(label, val, sub, cls){ var c=document.createElement('div'); c.className='fin-tile'+(cls?' '+cls:''); var l=document.createElement('div'); l.className='fin-tl'; l.textContent=label; var v=document.createElement('div'); v.className='fin-tv'; v.textContent=val; c.appendChild(l); c.appendChild(v); if(sub){ var s=document.createElement('div'); s.className='fin-ts'; s.textContent=sub; c.appendChild(s); } return c; }
+  var tiles=document.createElement('div'); tiles.className='fin-tiles';
+  tiles.appendChild(tile('Income received', finMoney(t.income), 'ex GST, all streams'));
+  tiles.appendChild(tile('Stripe clips', finMoney(t.clips,2), d.stripe.ok?'live from Stripe':'not loaded', 'clips'));
+  tiles.appendChild(tile('Blanks margin', finMoney(t.blanksMargin), finMoney(t.blanks)+' sold − '+finMoney(t.blanksCost)+' cost', 'blanks'));
+  tiles.appendChild(tile('Expenses', finMoney(t.expenses), 'ex GST', 'exp'));
+  tiles.appendChild(tile('Net profit', finMoney(t.net), null, t.net>=0?'pos':'neg'));
+  tiles.appendChild(tile('Each (50/50)', finMoney(t.shareEach), 'Griff / Holly'));
+  tiles.appendChild(tile('Outstanding', finMoney(t.outstanding), 'invoiced, not yet paid'));
+  tiles.appendChild(tile('GST owing', finMoney(t.gstNet), finMoney(t.gstCollected)+' collected − '+finMoney(t.gstPaid)+' paid'));
+  w.appendChild(tiles);
+
+  var charts=document.createElement('div'); charts.className='fin-charts';
+  var c1=document.createElement('div'); c1.className='fin-card';
+  var c1h=document.createElement('div'); c1h.className='fin-ch'; c1h.textContent='Where the money comes from'; c1.appendChild(c1h);
+  var dw=document.createElement('div'); dw.className='fin-dwrap';
+  dw.appendChild(finDonut([{l:FIN_LAB.service,v:t.service,c:FIN_COL.service},{l:FIN_LAB.blanks,v:t.blanks,c:FIN_COL.blanks},{l:FIN_LAB.clips,v:t.clips,c:FIN_COL.clips}]));
+  var lg=document.createElement('div'); lg.className='fin-legend';
+  [['service',t.service],['blanks',t.blanks],['clips',t.clips]].forEach(function(p){
+    var li=document.createElement('div'); var sw=document.createElement('span'); sw.className='fin-sw'; sw.style.background=FIN_COL[p[0]]; li.appendChild(sw);
+    var tx=document.createElement('span'); tx.textContent=FIN_LAB[p[0]]+' '; var b=document.createElement('b'); b.textContent=finMoney(p[1]); tx.appendChild(b);
+    var pc=document.createElement('span'); pc.className='fin-pc'; pc.textContent=t.income?(' '+Math.round(100*p[1]/t.income)+'%'):''; tx.appendChild(pc);
+    li.appendChild(tx); lg.appendChild(li);
+  });
+  dw.appendChild(lg); c1.appendChild(dw); charts.appendChild(c1);
+  var c2=document.createElement('div'); c2.className='fin-card fin-wide';
+  var c2h=document.createElement('div'); c2h.className='fin-ch'; c2h.textContent='By month'; c2.appendChild(c2h);
+  c2.appendChild(finColumns(d.months));
+  var lg2=document.createElement('div'); lg2.className='fin-legend fin-legend-row';
+  ['service','blanks','clips','expenses'].forEach(function(k){ var li=document.createElement('div'); var sw=document.createElement('span'); sw.className='fin-sw'; sw.style.background=FIN_COL[k]; li.appendChild(sw); li.appendChild(document.createTextNode(FIN_LAB[k])); lg2.appendChild(li); });
+  c2.appendChild(lg2); charts.appendChild(c2);
+  w.appendChild(charts);
+
+  var cc=document.createElement('div'); cc.className='fin-card';
+  var cch=document.createElement('div'); cch.className='fin-ch'; cch.textContent='By client'; cc.appendChild(cch);
+  if(!d.clients.length){ var np=document.createElement('p'); np.className='fin-upd'; np.textContent='Nothing received this financial year yet.'; cc.appendChild(np); }
+  else {
+    var tb=document.createElement('table'); tb.className='fin-table';
+    tb.innerHTML='<thead><tr><th>Client</th><th>Income</th><th>Blanks</th><th>Blanks cost</th><th>Blanks margin</th><th>Clips</th><th>Total</th><th>Owing</th></tr></thead>';
+    var tbody=document.createElement('tbody');
+    d.clients.forEach(function(c){
+      var tr=document.createElement('tr');
+      [c.name, finMoney(c.service), finMoney(c.blanks), finMoney(c.blanksCost), finMoney(c.blanksMargin), finMoney(c.clips,2), finMoney(c.total), c.outstanding?finMoney(c.outstanding):'—'].forEach(function(v,i){ var td=document.createElement(i?'td':'th'); td.textContent=v; if(i===7&&c.outstanding) td.className='fin-owe'; tr.appendChild(td); });
+      tbody.appendChild(tr);
+    });
+    tb.appendChild(tbody); cc.appendChild(tb);
+  }
+  w.appendChild(cc);
+
+  var owing=d.invoices.filter(function(v){ return v.outstanding>0; });
+  if(owing.length){
+    var oc=document.createElement('div'); oc.className='fin-card';
+    var och=document.createElement('div'); och.className='fin-ch'; och.textContent='Unpaid invoices'; oc.appendChild(och);
+    var ot=document.createElement('table'); ot.className='fin-table';
+    ot.innerHTML='<thead><tr><th>Invoice</th><th>Client</th><th>Date</th><th>Total</th><th>Received</th><th>Owing</th><th>Status</th></tr></thead>';
+    var ob=document.createElement('tbody');
+    owing.forEach(function(v){ var tr=document.createElement('tr'); [v.no, v.client, v.date?new Date(v.date+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'', finMoney(v.total,2), finMoney(v.received,2), finMoney(v.outstanding,2), v.status].forEach(function(x,i){ var td=document.createElement(i?'td':'th'); td.textContent=x; if(i===5) td.className='fin-owe'; tr.appendChild(td); }); ob.appendChild(tr); });
+    ot.appendChild(ob); oc.appendChild(ot); w.appendChild(oc);
+  }
+  sheet.appendChild(w);
+}
+
 function renderContacts(){
   sheet.innerHTML='';
   var head=document.createElement('div'); head.className='proj-head';
@@ -3364,7 +3577,7 @@ function render(){
 
   // per-business tabs
   var TABS = {
-    gmc: hubTabs(),
+    gmc: [['finance','Finance']].concat(hubTabs()),
     cb: hubTabs(),
     me:[['tasks','To-do'],['jot','Jot'],['calendar','Calendar']],
     pit:[['tasks','Tasks'],['grid','Grid'],['store','Store'+(ST_UNFUL?' <span style="background:#a32222;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;">'+ST_UNFUL+'</span>':'')]]
@@ -3412,6 +3625,7 @@ function render(){
   if(S.page==='calendar'){ document.getElementById('headcount').textContent=''; renderCalendar(); return; }
   if(S.page==='jot'){ document.getElementById('headcount').textContent=''; renderJot(); return; }
   if(S.page==='audit'){ document.getElementById('headcount').textContent=''; renderAudit(); return; }
+  if(S.page==='finance'){ document.getElementById('headcount').textContent=''; renderFinance(); return; }
 
   var dockEl=document.getElementById('dock'); if(dockEl) dockEl.style.display='none';  // business is the scope
   var c=counts();
