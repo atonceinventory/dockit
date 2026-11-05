@@ -585,6 +585,7 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .fin-acts{white-space:nowrap}
 .fin-acts .act{font-size:11px;padding:4px 9px;margin-left:6px}
 .fin-gst{border-left:6px solid #1e7a3c}
+.fin-gst .fin-gst-msg{margin-top:8px}
 .fin-gst.near{border-left-color:#c78a00}
 .fin-gst.hit{border-left-color:#a32222}
 .fin-gst-line{font-size:13px}
@@ -3421,19 +3422,36 @@ function finQuarterCard(d){
   var note=document.createElement('div'); note.className='fin-upd'; note.textContent='PDF opens a print view: choose Save as PDF. CSV has the P&L plus every line behind it, for the accountant.'; card.appendChild(note);
   return card;
 }
+function finBasDue(q){ /* standard quarterly BAS lodgement: 28 days after quarter end (Q2 gets to 28 Feb) */
+  var e=new Date(q.end); var y=e.getUTCFullYear(), m=e.getUTCMonth();
+  return (m===0) ? Date.UTC(y,1,28) : Date.UTC(y,m,28);
+}
 function finGstCard(d){
-  var g=d.gst||{threshold:75000,rolling12m:0}; var pct=Math.min(100, Math.round(100*g.rolling12m/g.threshold));
-  var card=document.createElement('div'); card.className='fin-card fin-gst'+(g.rolling12m>=g.threshold?' hit':(pct>=70?' near':''));
-  var h=document.createElement('div'); h.className='fin-ch'; h.textContent='GST registration threshold'; card.appendChild(h);
-  var line=document.createElement('div'); line.className='fin-gst-line';
-  var b=document.createElement('b'); b.textContent=finMoney(g.rolling12m); line.appendChild(b);
-  line.appendChild(document.createTextNode(' of '+finMoney(g.threshold)+' · rolling 12-month GST turnover ('+pct+'%)'));
-  card.appendChild(line);
-  var bar=document.createElement('div'); bar.className='fin-bar'; var fill=document.createElement('div'); fill.style.width=pct+'%'; bar.appendChild(fill); card.appendChild(bar);
+  var qs=finQuarters(d), now=Date.now();
+  var card=document.createElement('div'); card.className='fin-card fin-gst';
+  var h=document.createElement('div'); h.className='fin-ch'; h.textContent='GST payable (BAS)'; card.appendChild(h);
+  var tb=document.createElement('table'); tb.className='fin-table';
+  tb.innerHTML='<thead><tr><th>Quarter</th><th>Collected (1A)</th><th>Paid (1B)</th><th>Net payable</th><th>BAS due</th><th>Status</th></tr></thead>';
+  var body=document.createElement('tbody'), urgent=null;
+  qs.forEach(function(q){
+    var due=finBasDue(q), days=Math.ceil((due-now)/86400000), st='', cls='';
+    if(!q.hasData && !q.current){ st='\u2014'; }
+    else if(now<q.start){ st='not started'; }
+    else if(q.current){ st='in progress'; }
+    else if(days>=0){ st='due in '+days+' day'+(days===1?'':'s'); cls=days<=21?'fin-owe':''; if(q.gst.net>0&&days<=21) urgent=urgent||{q:q,days:days}; }
+    else { st='was due '+new Date(due).toLocaleDateString('en-AU',{day:'numeric',month:'short'}); cls='fin-owe'; }
+    var tr=document.createElement('tr'); if(q.current) tr.className='fin-cur';
+    var th=document.createElement('th'); th.textContent=q.k+' \u00b7 '+q.label; tr.appendChild(th);
+    [finMoney(q.gst.collected,2), finMoney(q.gst.paid,2), finMoney(q.gst.net,2), new Date(due).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}), st].forEach(function(v,i){
+      var td=document.createElement('td'); td.textContent=(q.hasData||q.current)?v:(i===3?v:'\u2014'); if(i===2&&q.hasData) td.style.fontWeight='700'; if(i===4) td.className=cls; tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+  tb.appendChild(body); card.appendChild(tb);
+  var cur=qs.filter(function(q){ return q.current; })[0];
   var msg=document.createElement('div'); msg.className='fin-gst-msg';
-  if(g.rolling12m>=g.threshold) msg.textContent='Threshold reached. The ATO requires GST registration within 21 days of GST turnover meeting $75,000 in the current or projected 12 months. The GST set aside in the bank covers the liability from the registration date.';
-  else if(pct>=70) msg.textContent='Getting close. If the next few months look like the last few, projected 12-month turnover may cross $75,000 before the actual figure does — the ATO counts the projection too, so check it monthly from here.';
-  else msg.textContent='Below the threshold. Figure is income ex GST received in the last 12 months across all streams, matching the ATO GST turnover test. Keep setting GST aside; nothing is payable until registered.';
+  if(urgent){ card.classList.add('hit'); msg.textContent='BAS for '+urgent.q.label+' is due in '+urgent.days+' day'+(urgent.days===1?'':'s')+': '+finMoney(urgent.q.gst.net,2)+' net GST to pay. Make sure that much is sitting in the GST account.'; }
+  else if(cur){ msg.textContent='So far this quarter: keep at least '+finMoney(Math.max(0,cur.gst.net),2)+' set aside. Registered for GST, so it is payable on every BAS regardless of turnover (rolling 12-month turnover is '+finMoney((d.gst&&d.gst.rolling12m)||0)+').'; }
   card.appendChild(msg);
   return card;
 }
@@ -3481,7 +3499,7 @@ function renderFinance(){
   tiles.appendChild(tile('Outstanding', finMoney(t.outstanding), 'invoiced, not yet paid'));
   tiles.appendChild(tile('GST owing', finMoney(t.gstNet), finMoney(t.gstCollected)+' collected − '+finMoney(t.gstPaid)+' paid'));
   w.appendChild(tiles);
-  if(d.gst && d.gst.rolling12m>=d.gst.threshold){ var gb=document.createElement('div'); gb.className='fin-warn'; gb.textContent='GST registration threshold reached: rolling 12-month turnover is '+finMoney(d.gst.rolling12m)+'. Register for GST within 21 days.'; w.appendChild(gb); }
+  (function(){ var now=Date.now(); finQuarters(d).forEach(function(q){ var due=finBasDue(q), days=Math.ceil((due-now)/86400000); if(q.hasData && !q.current && now>=q.end && days>=0 && days<=21 && q.gst.net>0){ var gb=document.createElement('div'); gb.className='fin-warn'; gb.textContent='BAS due '+new Date(due).toLocaleDateString('en-AU',{day:'numeric',month:'long'})+' ('+days+' day'+(days===1?'':'s')+'): '+finMoney(q.gst.net,2)+' net GST payable for '+q.label+'.'; w.appendChild(gb); } }); })();
   w.appendChild(finGstCard(d));
 
   var charts=document.createElement('div'); charts.className='fin-charts';
