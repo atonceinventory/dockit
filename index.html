@@ -580,6 +580,20 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .fin-table thead th{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-mut);font-weight:700}
 .fin-table tbody th{font-weight:700}
 .fin-owe{color:#a32222;font-weight:700}
+.fin-cur th{color:var(--fg)}
+.fin-cur{background:rgba(233,206,92,.18)}
+.fin-acts{white-space:nowrap}
+.fin-acts .act{font-size:11px;padding:4px 9px;margin-left:6px}
+.fin-gst{border-left:6px solid #1e7a3c}
+.fin-gst.near{border-left-color:#c78a00}
+.fin-gst.hit{border-left-color:#a32222}
+.fin-gst-line{font-size:13px}
+.fin-gst-line b{font-size:18px;margin-right:4px}
+.fin-bar{height:12px;background:rgba(30,35,82,.14);border:1px solid #6a6d82;margin:8px 0}
+.fin-bar div{height:100%;background:#1e7a3c;transition:width .3s}
+.fin-gst.near .fin-bar div{background:#c78a00}
+.fin-gst.hit .fin-bar div{background:#a32222}
+.fin-gst-msg{font-size:12.5px;color:var(--fg-mut);line-height:1.5}
 @media (max-width:720px){
   .fin-tiles{grid-template-columns:repeat(2,1fr)}
   .fin-tv{font-size:20px}
@@ -3287,6 +3301,142 @@ function finColumns(months){
   });
   return svg;
 }
+/* ── quarterly P&L + GST threshold ── */
+function finQuarters(d){
+  var y=d.fy.year, qs=[
+    {k:'Q1', label:'Jul–Sep '+y,     start:Date.UTC(y,6,1),  end:Date.UTC(y,9,1)},
+    {k:'Q2', label:'Oct–Dec '+y,     start:Date.UTC(y,9,1),  end:Date.UTC(y+1,0,1)},
+    {k:'Q3', label:'Jan–Mar '+(y+1), start:Date.UTC(y+1,0,1), end:Date.UTC(y+1,3,1)},
+    {k:'Q4', label:'Apr–Jun '+(y+1), start:Date.UTC(y+1,3,1), end:Date.UTC(y+1,6,1)}
+  ];
+  function ts(iso){ return iso ? Date.parse(iso.slice(0,10)+'T00:00:00Z') : NaN; }
+  qs.forEach(function(q){
+    q.income={service:0,blanks:0,clips:0}; q.clients={}; q.cats={}; q.expenses=0; q.gst={salesInc:0,collected:0,paid:0}; q.rows={payments:[],expenses:[],clips:[]};
+    function cl(n){ n=(n||'Unassigned').trim()||'Unassigned'; return q.clients[n]=q.clients[n]||{service:0,blanks:0,clips:0}; }
+    (d.payments||[]).forEach(function(p){ var t=ts(p.date); if(!(t>=q.start&&t<q.end)) return; q.income[p.type]+=p.exGst; cl(p.client)[p.type]+=p.exGst; q.gst.salesInc+=p.incGst; q.gst.collected+=p.gst; q.rows.payments.push(p); });
+    ((d.stripe&&d.stripe.fees)||[]).forEach(function(f){ var t=ts(f.created); if(!(t>=q.start&&t<q.end)) return; q.income.clips+=f.amount; cl(d.stripe.client).clips+=f.amount; q.rows.clips.push(f); });
+    (d.expenses||[]).forEach(function(e){ var t=ts(e.date); if(!(t>=q.start&&t<q.end)) return; var c=e.category||'Other'; q.cats[c]=(q.cats[c]||0)+e.exGst; q.expenses+=e.exGst; q.gst.paid+=e.gst; q.rows.expenses.push(e); });
+    q.totalIncome=q.income.service+q.income.blanks+q.income.clips;
+    q.net=q.totalIncome-q.expenses;
+    q.gst.net=q.gst.collected-q.gst.paid;
+    q.outstanding=(d.invoices||[]).filter(function(v){ return v.outstanding>0 && ts(v.date)<q.end; }).reduce(function(a,v){ return a+v.outstanding; },0);
+    q.hasData=!!(q.rows.payments.length||q.rows.expenses.length||q.rows.clips.length);
+    q.current=Date.now()>=q.start && Date.now()<q.end;
+  });
+  return qs;
+}
+function finPnlLines(d,q){
+  var L=[]; function add(sec,item,amt){ L.push({section:sec,item:item,amount:amt}); }
+  add('Income (ex GST)','Service income',q.income.service);
+  add('Income (ex GST)','Blanks',q.income.blanks);
+  add('Income (ex GST)','Stripe clips ('+d.stripe.client+')',q.income.clips);
+  add('Income (ex GST)','Total income',q.totalIncome);
+  var cats=Object.keys(q.cats).sort(); if(!cats.length) add('Expenses (ex GST)','No expenses recorded',0);
+  cats.forEach(function(c){ add('Expenses (ex GST)',c,q.cats[c]); });
+  add('Expenses (ex GST)','Total expenses',q.expenses);
+  add('Result','Net profit',q.net);
+  add('Profit share','Griff (50%)',q.net/2);
+  add('Profit share','Holly (50%)',q.net/2);
+  add('GST (BAS)','Total sales inc GST (G1)',q.gst.salesInc);
+  add('GST (BAS)','GST collected on sales (1A)',q.gst.collected);
+  add('GST (BAS)','GST paid on purchases (1B)',q.gst.paid);
+  add('GST (BAS)','Net GST payable (refund if negative)',q.gst.net);
+  add('Invoices','Invoiced, not yet received at quarter end (inc GST)',q.outstanding);
+  return L;
+}
+function finDownload(name, text, mime){
+  var b=new Blob([text],{type:mime||'text/plain'}), u=URL.createObjectURL(b), a=document.createElement('a');
+  a.href=u; a.download=name; document.body.appendChild(a); a.click(); setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(u); },500);
+}
+function finExportCsv(d,q){
+  function esc(v){ v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+  var out=['GMC profit and loss,'+esc(q.label)+','+d.fy.label, 'Cash basis. Income counts when received, expenses when paid. Amounts in AUD.', ''];
+  out.push('Section,Line,Amount');
+  finPnlLines(d,q).forEach(function(l){ out.push(esc(l.section)+','+esc(l.item)+','+l.amount.toFixed(2)); });
+  out.push('','Income by client (ex GST)','Client,Service,Blanks,Clips,Total');
+  Object.keys(q.clients).sort().forEach(function(n){ var c=q.clients[n]; out.push(esc(n)+','+c.service.toFixed(2)+','+c.blanks.toFixed(2)+','+c.clips.toFixed(2)+','+(c.service+c.blanks+c.clips).toFixed(2)); });
+  out.push('','Payments received','Date,Invoice,Client,Type,Ex GST,GST,Inc GST,Notes');
+  q.rows.payments.forEach(function(p){ out.push([p.date,p.invoice,p.client,p.type,p.exGst.toFixed(2),p.gst.toFixed(2),p.incGst.toFixed(2),p.notes].map(esc).join(',')); });
+  out.push('','Stripe clips','Date,Amount,Charge');
+  q.rows.clips.forEach(function(f){ out.push([f.created.slice(0,10),f.amount.toFixed(2),f.charge||''].map(esc).join(',')); });
+  out.push('','Expenses','Date,Supplier,Description,Category,Client,Ex GST,GST,Inc GST');
+  q.rows.expenses.forEach(function(e){ out.push([e.date,e.supplier,e.description,e.category,e.client,e.exGst.toFixed(2),e.gst.toFixed(2),e.incGst.toFixed(2)].map(esc).join(',')); });
+  finDownload('GMC-PnL-'+d.fy.label+'-'+q.k+'.csv', out.join('\n'), 'text/csv');
+}
+function finPnlHtml(d,q){
+  function h(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function m(x){ return finMoney(x,2); }
+  var lines=finPnlLines(d,q), sec='', rows='';
+  lines.forEach(function(l){
+    if(l.section!==sec){ sec=l.section; rows+='<tr class="sec"><th colspan="2">'+h(sec)+'</th></tr>'; }
+    var tot=/^(Total|Net)/.test(l.item);
+    rows+='<tr'+(tot?' class="tot"':'')+'><td>'+h(l.item)+'</td><td class="n">'+m(l.amount)+'</td></tr>';
+  });
+  var cl='';
+  Object.keys(q.clients).sort().forEach(function(n){ var c=q.clients[n]; cl+='<tr><td>'+h(n)+'</td><td class="n">'+m(c.service)+'</td><td class="n">'+m(c.blanks)+'</td><td class="n">'+m(c.clips)+'</td><td class="n"><b>'+m(c.service+c.blanks+c.clips)+'</b></td></tr>'; });
+  var pay=''; q.rows.payments.forEach(function(p){ pay+='<tr><td>'+h(p.date)+'</td><td>'+h(p.invoice)+'</td><td>'+h(p.client)+'</td><td>'+h(p.type)+'</td><td class="n">'+m(p.exGst)+'</td><td class="n">'+m(p.gst)+'</td><td class="n">'+m(p.incGst)+'</td></tr>'; });
+  q.rows.clips.forEach(function(f){ pay+='<tr><td>'+h(f.created.slice(0,10))+'</td><td>Stripe</td><td>'+h(d.stripe.client)+'</td><td>clips</td><td class="n">'+m(f.amount)+'</td><td class="n">—</td><td class="n">'+m(f.amount)+'</td></tr>'; });
+  var ex=''; q.rows.expenses.forEach(function(e){ ex+='<tr><td>'+h(e.date)+'</td><td>'+h(e.supplier)+'</td><td>'+h(e.description)+'</td><td>'+h(e.category)+'</td><td class="n">'+m(e.exGst)+'</td><td class="n">'+m(e.gst)+'</td><td class="n">'+m(e.incGst)+'</td></tr>'; });
+  var title='GMC profit and loss — '+q.label;
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>'+h(title)+'</title><style>'+
+    'body{font:13px/1.45 Georgia,"Times New Roman",serif;color:#1c1f4a;margin:36px;max-width:820px}h1{font-size:22px;margin:0 0 2px}h2{font-size:14px;margin:26px 0 6px;letter-spacing:.04em;text-transform:uppercase}'+
+    '.sub{color:#555;margin:0 0 18px}table{width:100%;border-collapse:collapse;margin-top:4px}td,th{padding:5px 8px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}'+
+    'tr.sec th{background:#eef0fb;font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding-top:10px}tr.tot td{font-weight:700;border-top:1px solid #1c1f4a}thead th{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.04em}'+
+    '.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.btn{font:inherit;padding:8px 14px;border:1px solid #1c1f4a;background:#fff;cursor:pointer}.foot{margin-top:30px;color:#666;font-size:11px}'+
+    '@media print{.bar{display:none}body{margin:0}}</style></head><body>'+
+    '<div class="bar"><span>Use Save as PDF in the print dialog.</span><button class="btn" onclick="window.print()">Print / Save as PDF</button></div>'+
+    '<h1>Good Morning Charlie</h1><div class="sub">Profit and loss — '+h(q.label)+' ('+h(d.fy.label)+'). Cash basis, amounts in AUD. Prepared '+new Date().toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'})+'.</div>'+
+    '<table>'+rows+'</table>'+
+    '<h2>Income by client (ex GST)</h2><table><thead><tr><th>Client</th><th class="n">Service</th><th class="n">Blanks</th><th class="n">Clips</th><th class="n">Total</th></tr></thead>'+(cl||'<tr><td colspan="5">None</td></tr>')+'</table>'+
+    '<h2>Income received</h2><table><thead><tr><th>Date</th><th>Ref</th><th>Client</th><th>Type</th><th class="n">Ex GST</th><th class="n">GST</th><th class="n">Inc GST</th></tr></thead>'+(pay||'<tr><td colspan="7">None</td></tr>')+'</table>'+
+    '<h2>Expenses paid</h2><table><thead><tr><th>Date</th><th>Supplier</th><th>Description</th><th>Category</th><th class="n">Ex GST</th><th class="n">GST</th><th class="n">Inc GST</th></tr></thead>'+(ex||'<tr><td colspan="7">None</td></tr>')+'</table>'+
+    '<div class="foot">Source: GMC finance sheet and Stripe, via Docket. Stripe clips are GMC application fees on '+h(d.stripe.client)+' memberships and are shown without a GST split.</div>'+
+    '</body></html>';
+  return html;
+}
+function finExportPdf(d,q){
+  var html=finPnlHtml(d,q);
+  var u=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+  var win=window.open(u,'_blank');
+  if(!win){ finDownload('GMC-PnL-'+d.fy.label+'-'+q.k+'.html', html, 'text/html'); }
+  setTimeout(function(){ URL.revokeObjectURL(u); }, 60000);
+}
+function finQuarterCard(d){
+  var card=document.createElement('div'); card.className='fin-card';
+  var h=document.createElement('div'); h.className='fin-ch'; h.textContent='Quarterly P&L'; card.appendChild(h);
+  var tb=document.createElement('table'); tb.className='fin-table';
+  tb.innerHTML='<thead><tr><th>Quarter</th><th>Income</th><th>Expenses</th><th>Net</th><th>GST net</th><th></th></tr></thead>';
+  var body=document.createElement('tbody');
+  finQuarters(d).forEach(function(q){
+    var tr=document.createElement('tr'); if(q.current) tr.className='fin-cur';
+    var th=document.createElement('th'); th.textContent=q.k+' · '+q.label+(q.current?' (current)':''); tr.appendChild(th);
+    [finMoney(q.totalIncome), finMoney(q.expenses), finMoney(q.net), finMoney(q.gst.net)].forEach(function(v,i){ var td=document.createElement('td'); td.textContent=q.hasData?v:'—'; if(i===2&&q.hasData) td.style.color=q.net>=0?'#1e7a3c':'#a32222'; tr.appendChild(td); });
+    var td=document.createElement('td'); td.className='fin-acts';
+    var pdf=document.createElement('button'); pdf.className='act'; pdf.textContent='PDF'; pdf.disabled=!q.hasData; pdf.onclick=function(){ finExportPdf(d,q); };
+    var csv=document.createElement('button'); csv.className='act'; csv.textContent='CSV'; csv.disabled=!q.hasData; csv.onclick=function(){ finExportCsv(d,q); };
+    td.appendChild(pdf); td.appendChild(csv); tr.appendChild(td);
+    body.appendChild(tr);
+  });
+  tb.appendChild(body); card.appendChild(tb);
+  var note=document.createElement('div'); note.className='fin-upd'; note.textContent='PDF opens a print view: choose Save as PDF. CSV has the P&L plus every line behind it, for the accountant.'; card.appendChild(note);
+  return card;
+}
+function finGstCard(d){
+  var g=d.gst||{threshold:75000,rolling12m:0}; var pct=Math.min(100, Math.round(100*g.rolling12m/g.threshold));
+  var card=document.createElement('div'); card.className='fin-card fin-gst'+(g.rolling12m>=g.threshold?' hit':(pct>=70?' near':''));
+  var h=document.createElement('div'); h.className='fin-ch'; h.textContent='GST registration threshold'; card.appendChild(h);
+  var line=document.createElement('div'); line.className='fin-gst-line';
+  var b=document.createElement('b'); b.textContent=finMoney(g.rolling12m); line.appendChild(b);
+  line.appendChild(document.createTextNode(' of '+finMoney(g.threshold)+' · rolling 12-month GST turnover ('+pct+'%)'));
+  card.appendChild(line);
+  var bar=document.createElement('div'); bar.className='fin-bar'; var fill=document.createElement('div'); fill.style.width=pct+'%'; bar.appendChild(fill); card.appendChild(bar);
+  var msg=document.createElement('div'); msg.className='fin-gst-msg';
+  if(g.rolling12m>=g.threshold) msg.textContent='Threshold reached. The ATO requires GST registration within 21 days of GST turnover meeting $75,000 in the current or projected 12 months. The GST set aside in the bank covers the liability from the registration date.';
+  else if(pct>=70) msg.textContent='Getting close. If the next few months look like the last few, projected 12-month turnover may cross $75,000 before the actual figure does — the ATO counts the projection too, so check it monthly from here.';
+  else msg.textContent='Below the threshold. Figure is income ex GST received in the last 12 months across all streams, matching the ATO GST turnover test. Keep setting GST aside; nothing is payable until registered.';
+  card.appendChild(msg);
+  return card;
+}
 function renderFinance(){
   sheet.innerHTML='';
   var w=document.createElement('div'); w.className='fin';
@@ -3331,6 +3481,8 @@ function renderFinance(){
   tiles.appendChild(tile('Outstanding', finMoney(t.outstanding), 'invoiced, not yet paid'));
   tiles.appendChild(tile('GST owing', finMoney(t.gstNet), finMoney(t.gstCollected)+' collected − '+finMoney(t.gstPaid)+' paid'));
   w.appendChild(tiles);
+  if(d.gst && d.gst.rolling12m>=d.gst.threshold){ var gb=document.createElement('div'); gb.className='fin-warn'; gb.textContent='GST registration threshold reached: rolling 12-month turnover is '+finMoney(d.gst.rolling12m)+'. Register for GST within 21 days.'; w.appendChild(gb); }
+  w.appendChild(finGstCard(d));
 
   var charts=document.createElement('div'); charts.className='fin-charts';
   var c1=document.createElement('div'); c1.className='fin-card';
@@ -3368,6 +3520,8 @@ function renderFinance(){
     tb.appendChild(tbody); cc.appendChild(tb);
   }
   w.appendChild(cc);
+
+  w.appendChild(finQuarterCard(d));
 
   var owing=d.invoices.filter(function(v){ return v.outstanding>0; });
   if(owing.length){

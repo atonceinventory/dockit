@@ -220,7 +220,7 @@ export default async function handler(req, res) {
 
   const [sheetRes, clipsRes] = await Promise.allSettled([
     readSheet(process.env.GMC_SHEET_ID || DEFAULT_SHEET),
-    readClips(fyStart, fyEnd)
+    readClips(Math.min(fyStart, now.getTime() - 366 * 86400000), Math.max(fyEnd, now.getTime() + 86400000))
   ]);
 
   if (sheetRes.status === 'fulfilled') {
@@ -273,8 +273,10 @@ export default async function handler(req, res) {
     out.stripe.activeMembers = clipsRes.value.activeMembers;
     const c = client(out.stripe.client);
     clipsRes.value.fees.forEach(function (f) {
+      const fd = new Date(f.created);
+      if (!inFY(fd)) return;
       out.totals.clips += f.amount; c.clips += f.amount;
-      const mi = mIdx[monthKey(new Date(f.created))]; if (mi !== undefined) months[mi].clips += f.amount;
+      const mi = mIdx[monthKey(fd)]; if (mi !== undefined) months[mi].clips += f.amount;
     });
   } else {
     out.stripe.error = (clipsRes.reason && clipsRes.reason.message) || String(clipsRes.reason);
@@ -295,6 +297,13 @@ export default async function handler(req, res) {
     Object.keys(c).forEach(function (f) { if (typeof c[f] === 'number') c[f] = Math.round(c[f] * 100) / 100; });
     return c;
   }).sort(function (a, b) { return b.total - a.total; });
+
+  // GST registration threshold (ATO): $75,000 GST turnover in the current or projected 12 months.
+  const since = now.getTime() - 365 * 86400000;
+  let rolling = 0;
+  out.payments.forEach(function (p) { const d = parseDate(p.date); if (d && d.getTime() >= since) rolling += p.exGst; });
+  out.stripe.fees.forEach(function (f) { if (new Date(f.created).getTime() >= since) rolling += f.amount; });
+  out.gst = { threshold: 75000, rolling12m: Math.round(rolling * 100) / 100, fyToDate: t.income, asOf: now.toISOString().slice(0, 10) };
 
   res.status(200).json(out);
 }
