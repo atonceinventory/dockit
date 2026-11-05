@@ -3315,7 +3315,7 @@ function finQuarters(d){
     q.income={service:0,blanks:0,clips:0}; q.clients={}; q.cats={}; q.expenses=0; q.gst={salesInc:0,collected:0,paid:0}; q.rows={payments:[],expenses:[],clips:[]};
     function cl(n){ n=(n||'Unassigned').trim()||'Unassigned'; return q.clients[n]=q.clients[n]||{service:0,blanks:0,clips:0}; }
     (d.payments||[]).forEach(function(p){ var t=ts(p.date); if(!(t>=q.start&&t<q.end)) return; q.income[p.type]+=p.exGst; cl(p.client)[p.type]+=p.exGst; q.gst.salesInc+=p.incGst; q.gst.collected+=p.gst; q.rows.payments.push(p); });
-    ((d.stripe&&d.stripe.fees)||[]).forEach(function(f){ var t=ts(f.created); if(!(t>=q.start&&t<q.end)) return; q.income.clips+=f.amount; cl(d.stripe.client).clips+=f.amount; q.rows.clips.push(f); });
+    (d.stripe&&d.stripe.mode==='live'?d.stripe.fees:[]).forEach(function(f){ var t=ts(f.created); if(!(t>=q.start&&t<q.end)) return; q.income.clips+=f.amount; cl(d.stripe.client).clips+=f.amount; q.rows.clips.push(f); });
     (d.expenses||[]).forEach(function(e){ var t=ts(e.date); if(!(t>=q.start&&t<q.end)) return; var c=e.category||'Other'; q.cats[c]=(q.cats[c]||0)+e.exGst; q.expenses+=e.exGst; q.gst.paid+=e.gst; q.rows.expenses.push(e); });
     q.totalIncome=q.income.service+q.income.blanks+q.income.clips;
     q.net=q.totalIncome-q.expenses;
@@ -3491,7 +3491,7 @@ function renderFinance(){
   function tile(label, val, sub, cls){ var c=document.createElement('div'); c.className='fin-tile'+(cls?' '+cls:''); var l=document.createElement('div'); l.className='fin-tl'; l.textContent=label; var v=document.createElement('div'); v.className='fin-tv'; v.textContent=val; c.appendChild(l); c.appendChild(v); if(sub){ var s=document.createElement('div'); s.className='fin-ts'; s.textContent=sub; c.appendChild(s); } return c; }
   var tiles=document.createElement('div'); tiles.className='fin-tiles';
   tiles.appendChild(tile('Income received', finMoney(t.income), 'ex GST, all streams'));
-  tiles.appendChild(tile('Stripe clips', finMoney(t.clips,2), d.stripe.ok?'live from Stripe':'not loaded', 'clips'));
+  tiles.appendChild(tile('Stripe clips', finMoney(t.clips,2), !d.stripe.ok?'not loaded':(d.stripe.mode==='live'?'live from Stripe':'Stripe in sandbox: '+finMoney(d.stripe.testTotal,2)+' test fees not counted'), 'clips'));
   tiles.appendChild(tile('Blanks margin', finMoney(t.blanksMargin), finMoney(t.blanks)+' sold − '+finMoney(t.blanksCost)+' cost', 'blanks'));
   tiles.appendChild(tile('Expenses', finMoney(t.expenses), 'ex GST', 'exp'));
   tiles.appendChild(tile('Net profit', finMoney(t.net), null, t.net>=0?'pos':'neg'));

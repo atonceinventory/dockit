@@ -8,9 +8,10 @@
 //   GMC_SHEETS_SA       service account JSON (raw or base64) that the sheet is shared with; falls back to SOLIS_FIREBASE_SA
 //   SOLIS_STRIPE_SECRET_KEY / SOLIS_STRIPE_ACCOUNT   reused from the Solis membership setup (clips)
 //   GMC_CLIPS_CLIENT    client name the clips belong to, default "Solis"
+//   GMC_STRIPE_SECRET_KEY  (optional) live key for reading clips while Solis is still on the sandbox key
 
 import crypto from 'node:crypto';
-import { stripe } from '../solis/_lib.js';
+import { formEncode } from '../solis/_lib.js';
 
 const FIREBASE_PROJECT = 'docket-6159b';
 const MEMBERS = ['griffgamble1@gmail.com', 'byhollyholiday@gmail.com', 'hello@gm-charlie.com'];
@@ -147,13 +148,26 @@ function typeOf(s) {
 
 // ---------- Stripe clips ----------
 
+function stripeKey() { return process.env.GMC_STRIPE_SECRET_KEY || process.env.SOLIS_STRIPE_SECRET_KEY || ''; }
+function stripeMode() { return /^sk_live_/.test(stripeKey()) ? 'live' : 'test'; }
+async function stripeGet(path, params, account) {
+  const key = stripeKey();
+  if (!key) throw new Error('No Stripe key configured');
+  const headers = { Authorization: 'Bearer ' + key, 'Stripe-Version': '2025-03-31.basil' };
+  if (account) headers['Stripe-Account'] = account;
+  const res = await fetch('https://api.stripe.com/v1' + path + '?' + formEncode(params).join('&'), { headers: headers });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data && data.error && data.error.message) || ('Stripe HTTP ' + res.status));
+  return data;
+}
+
 async function readClips(fyStart, fyEnd) {
   const fees = [];
   let after = null;
   for (let page = 0; page < 20; page++) {
     const params = { limit: 100, 'created[gte]': Math.floor(fyStart / 1000), 'created[lt]': Math.floor(fyEnd / 1000) };
     if (after) params.starting_after = after;
-    const data = await stripe('GET', '/application_fees', params);
+    const data = await stripeGet('/application_fees', params);
     (data.data || []).forEach(function (f) {
       fees.push({ id: f.id, created: new Date(f.created * 1000).toISOString(), amount: (f.amount - (f.amount_refunded || 0)) / 100, currency: f.currency, charge: f.charge });
     });
@@ -168,7 +182,7 @@ async function readClips(fyStart, fyEnd) {
       for (let page = 0; page < 10; page++) {
         const p = { status: 'active', limit: 100 };
         if (sAfter) p.starting_after = sAfter;
-        const subs = await stripe('GET', '/subscriptions', p, { account: acct });
+        const subs = await stripeGet('/subscriptions', p, acct);
         n += (subs.data || []).length;
         if (!subs.has_more || !subs.data.length) break;
         sAfter = subs.data[subs.data.length - 1].id;
@@ -209,7 +223,7 @@ export default async function handler(req, res) {
     months: months, clients: [], invoices: [], payments: [], expenses: [],
     totals: { service: 0, blanks: 0, blanksCost: 0, blanksMargin: 0, clips: 0, income: 0, expenses: 0, net: 0, shareEach: 0, outstanding: 0, gstCollected: 0, gstPaid: 0, gstNet: 0 },
     sheet: { ok: false, url: 'https://docs.google.com/spreadsheets/d/' + (process.env.GMC_SHEET_ID || DEFAULT_SHEET) + '/edit' },
-    stripe: { ok: false, fees: [], activeMembers: null, client: process.env.GMC_CLIPS_CLIENT || 'Solis' },
+    stripe: { ok: false, mode: stripeMode(), fees: [], activeMembers: null, testTotal: 0, client: process.env.GMC_CLIPS_CLIENT || 'Solis' },
     updatedAt: now.toISOString()
   };
   const clients = {};
@@ -272,9 +286,11 @@ export default async function handler(req, res) {
     out.stripe.fees = clipsRes.value.fees;
     out.stripe.activeMembers = clipsRes.value.activeMembers;
     const c = client(out.stripe.client);
+    const live = out.stripe.mode === 'live';
     clipsRes.value.fees.forEach(function (f) {
       const fd = new Date(f.created);
       if (!inFY(fd)) return;
+      if (!live) { out.stripe.testTotal += f.amount; return; }   // sandbox fees are not money
       out.totals.clips += f.amount; c.clips += f.amount;
       const mi = mIdx[monthKey(fd)]; if (mi !== undefined) months[mi].clips += f.amount;
     });
@@ -302,7 +318,7 @@ export default async function handler(req, res) {
   const since = now.getTime() - 365 * 86400000;
   let rolling = 0;
   out.payments.forEach(function (p) { const d = parseDate(p.date); if (d && d.getTime() >= since) rolling += p.exGst; });
-  out.stripe.fees.forEach(function (f) { if (new Date(f.created).getTime() >= since) rolling += f.amount; });
+  if (out.stripe.mode === 'live') out.stripe.fees.forEach(function (f) { if (new Date(f.created).getTime() >= since) rolling += f.amount; });
   out.gst = { threshold: 75000, rolling12m: Math.round(rolling * 100) / 100, fyToDate: t.income, asOf: now.toISOString().slice(0, 10) };
 
   res.status(200).json(out);
