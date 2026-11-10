@@ -18,7 +18,10 @@ function previewPage(req, res) {
   const desc = '$25 a week, no lock-in. Join in under a minute.';
   res.statusCode = 200;
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, max-age=600');
+  // Never let the CDN cache this: it is chosen per user-agent, and a cached copy
+  // would be served to real members instead of the redirect to Stripe.
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Vary', 'User-Agent');
   res.end('<!doctype html><html lang="en"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="robots" content="noindex,nofollow">' +
