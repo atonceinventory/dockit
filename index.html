@@ -4748,9 +4748,98 @@ function renderStorePage(){
 function stChartSlug(name){
   return (name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || ('chart-'+Date.now());
 }
+function stSplitLine(line){
+  if(line.indexOf('\t')>-1) return line.split('\t');
+  var out=[], cur='', q=false;
+  for(var i=0;i<line.length;i++){
+    var c=line[i];
+    if(c==='"'){ if(q && line[i+1]==='"'){ cur+='"'; i++; } else q=!q; }
+    else if(c===',' && !q){ out.push(cur); cur=''; }
+    else cur+=c;
+  }
+  out.push(cur);
+  return out;
+}
+// A size chart is a grid: first row is the sizes, each later row is a measurement.
+function stParseSizeGrid(grid){
+  grid = (grid||[]).map(function(r){ return (r||[]).map(function(c){ return (c==null?'':String(c)).trim(); }); })
+             .filter(function(r){ return r.some(function(c){ return c!==''; }); });
+  if(grid.length < 2) return { err:'Need a header row of sizes and at least one measurement row.' };
+  var sizes = grid[0].slice(1).filter(function(c){ return c!==''; });
+  if(!sizes.length) return { err:'Could not find size names in the first row.' };
+  var rows = [];
+  for(var i=1;i<grid.length;i++){
+    var r=grid[i];
+    var label=(r[0]||'').trim();
+    if(!label) continue;
+    var vals=r.slice(1, 1+sizes.length).map(function(v){
+      var n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+      return isNaN(n)?'':n;
+    });
+    if(!vals.some(function(v){ return v!==''; })) continue;
+    var detail='';
+    var m=label.match(/^(.*?)\s*[\(\[]([^\)\]]+)[\)\]]\s*$/);
+    if(m){ label=m[1].trim(); detail=m[2].trim().toLowerCase(); }
+    rows.push({ label:label, detail:detail, values:vals });
+  }
+  if(!rows.length) return { err:'Found sizes but no measurement rows with numbers.' };
+  return { sizes:sizes, rows:rows };
+}
+function stReadSizeFile(file, done){
+  var isSheet=/\.xlsx?$/i.test(file.name);
+  if(!isSheet){
+    var fr=new FileReader();
+    fr.onload=function(){
+      done(stParseSizeGrid(String(fr.result).replace(/\r/g,'').trim().split('\n').map(stSplitLine)));
+    };
+    fr.onerror=function(){ done({ err:'Could not read that file.' }); };
+    fr.readAsText(file);
+    return;
+  }
+  function parseXlsx(){
+    var fr=new FileReader();
+    fr.onload=function(){
+      try{
+        var wb=XLSX.read(new Uint8Array(fr.result), { type:'array' });
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        done(stParseSizeGrid(XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'' })));
+      }catch(e){ done({ err:'Could not read that spreadsheet: '+(e.message||e) }); }
+    };
+    fr.readAsArrayBuffer(file);
+  }
+  if(window.XLSX) parseXlsx();
+  else{
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload=parseXlsx;
+    s.onerror=function(){ done({ err:'Spreadsheet reader failed to load. Paste the table instead.' }); };
+    document.head.appendChild(s);
+  }
+}
 function stRenderSizeCharts(body){
   body.innerHTML='';
-  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:flex-end;';
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:flex-end;gap:8px;';
+
+  // Upload a chart: read the file, open the editor already filled in, so the
+  // only thing left to do is tick the products.
+  var up=document.createElement('button'); up.className='act'; up.textContent='Upload chart';
+  var upFile=document.createElement('input'); upFile.type='file';
+  upFile.accept='.csv,.tsv,.txt,.xlsx,.xls';
+  upFile.style.display='none';
+  up.onclick=function(){ upFile.value=''; upFile.click(); };
+  upFile.onchange=function(){
+    var f=upFile.files && upFile.files[0];
+    if(!f) return;
+    up.textContent='Reading…'; up.disabled=true;
+    stReadSizeFile(f, function(p){
+      up.textContent='Upload chart'; up.disabled=false;
+      if(p.err){ alert(p.err); return; }
+      var nm=f.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim();
+      stEditSizeChart(null, { name:nm, sizes:p.sizes, rows:p.rows });
+    });
+  };
+  bar.appendChild(upFile); bar.appendChild(up);
+
   var add=document.createElement('button'); add.className='gmc-red'; add.textContent='+ New size chart';
   add.onclick=function(){ stEditSizeChart(null); };
   bar.appendChild(add); body.appendChild(bar);
@@ -4758,7 +4847,7 @@ function stRenderSizeCharts(body){
   if(!ST.charts.length){
     var empty=document.createElement('div');
     empty.style.cssText='margin-top:14px;font-size:13px;color:var(--fg-dim,#555);';
-    empty.textContent='No size charts yet. Create one, fill in the measurements, then tick the products it applies to.';
+    empty.innerHTML='No size charts yet. Upload your spreadsheet and it reads the measurements straight in, then you just tick the products it applies to.<br><br>Layout it expects: row 1 is the sizes (leave A1 blank), column A is the measurement names. Brackets become the small grey sub-line, so <strong>CHEST (PIT TO PIT, HALF)</strong> shows as CHEST with "pit to pit, half" under it.';
     body.appendChild(empty);
     return;
   }
@@ -4785,10 +4874,11 @@ function stRenderSizeCharts(body){
   body.appendChild(grid);
 }
 
-function stEditSizeChart(ch){
+function stEditSizeChart(ch, seed){
   ST.sub='chart';
   var isNew = !ch;
-  ch = ch || { _id:'', name:'', title:'', intro:'', note:'', sizes:['S','M','L','XL'], rows:[], products:[] };
+  ch = ch || { _id:'', name:(seed&&seed.name)||'', title:'', intro:'', note:'',
+               sizes:(seed&&seed.sizes)||['S','M','L','XL'], rows:(seed&&seed.rows)||[], products:[] };
 
   sheet.innerHTML='';
   var w=document.createElement('div'); w.className='notif-wrap';
@@ -4848,90 +4938,23 @@ function stEditSizeChart(ch){
   impWrap.appendChild(impMsg);
   w.appendChild(impWrap);
 
-  function stSplitLine(line){
-    if(line.indexOf('\t')>-1) return line.split('\t');
-    var out=[], cur='', q=false;
-    for(var i=0;i<line.length;i++){
-      var c=line[i];
-      if(c==='"'){ if(q && line[i+1]==='"'){ cur+='"'; i++; } else q=!q; }
-      else if(c===',' && !q){ out.push(cur); cur=''; }
-      else cur+=c;
-    }
-    out.push(cur);
-    return out;
-  }
-  // A size chart is a grid: first row is the sizes, each later row is a measurement.
-  function stApplyGrid(grid){
-    grid = grid.map(function(r){ return r.map(function(c){ return (c==null?'':String(c)).trim(); }); })
-               .filter(function(r){ return r.some(function(c){ return c!==''; }); });
-    if(grid.length < 2) return 'Need a header row of sizes and at least one measurement row.';
-    var header = grid[0];
-    var newSizes = header.slice(1).filter(function(c){ return c!==''; });
-    if(!newSizes.length) return 'Could not find size names in the first row.';
-    var newRows = [];
-    for(var i=1;i<grid.length;i++){
-      var r=grid[i];
-      var label=(r[0]||'').trim();
-      if(!label) continue;
-      var vals=r.slice(1, 1+newSizes.length).map(function(v){
-        var n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));
-        return isNaN(n)?'':n;
-      });
-      if(!vals.some(function(v){ return v!==''; })) continue;
-      // "CHEST (PIT TO PIT, HALF)" → label + detail
-      var detail='';
-      var m=label.match(/^(.*?)\s*[\(\[]([^\)\]]+)[\)\]]\s*$/);
-      if(m){ label=m[1].trim(); detail=m[2].trim().toLowerCase(); }
-      newRows.push({ label:label, detail:detail, values:vals });
-    }
-    if(!newRows.length) return 'Found sizes but no measurement rows with numbers.';
-    sizes=newSizes;
-    rows=newRows;
+  function takeParsed(p){
+    if(p.err){ impMsg.textContent=p.err; return; }
+    sizes=p.sizes; rows=p.rows;
     fSizes.value=sizes.join(', ');
     drawRows();
-    return null;
+    impMsg.textContent='Filled '+rows.length+' measurements.';
   }
   impBtn.onclick=function(){
     var txt=impText.value.replace(/\r/g,'').trim();
     if(!txt){ impMsg.textContent='Paste the table first.'; return; }
-    var err=stApplyGrid(txt.split('\n').map(stSplitLine));
-    impMsg.textContent = err || ('Filled '+rows.length+' measurements.');
+    takeParsed(stParseSizeGrid(txt.split('\n').map(stSplitLine)));
   };
   impFile.onchange=function(){
     var f=impFile.files && impFile.files[0];
     if(!f) return;
     impMsg.textContent='Reading…';
-    var isSheet=/\.xlsx?$/i.test(f.name);
-    if(!isSheet){
-      var fr=new FileReader();
-      fr.onload=function(){
-        var err=stApplyGrid(String(fr.result).replace(/\r/g,'').trim().split('\n').map(stSplitLine));
-        impMsg.textContent = err || ('Filled '+rows.length+' measurements.');
-      };
-      fr.readAsText(f);
-      return;
-    }
-    function parseXlsx(){
-      var fr=new FileReader();
-      fr.onload=function(){
-        try{
-          var wb=XLSX.read(new Uint8Array(fr.result), { type:'array' });
-          var ws=wb.Sheets[wb.SheetNames[0]];
-          var grid=XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'' });
-          var err=stApplyGrid(grid);
-          impMsg.textContent = err || ('Filled '+rows.length+' measurements.');
-        }catch(e){ impMsg.textContent='Could not read that file: '+(e.message||e); }
-      };
-      fr.readAsArrayBuffer(f);
-    }
-    if(window.XLSX) parseXlsx();
-    else{
-      var s=document.createElement('script');
-      s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-      s.onload=parseXlsx;
-      s.onerror=function(){ impMsg.textContent='Spreadsheet reader failed to load. Paste the table instead.'; };
-      document.head.appendChild(s);
-    }
+    stReadSizeFile(f, takeParsed);
   };
 
   var rWrap=document.createElement('div'); rWrap.style.marginTop='8px'; w.appendChild(rWrap);
