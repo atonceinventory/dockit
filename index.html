@@ -904,6 +904,36 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
   border:1px solid var(--line-2);border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--fg-mut);
 }
 .logo-row input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+/* Store editors: give the plain white fields the same inked, bevelled edge
+   as the brick rows, so they read as part of Docket rather than bare inputs. */
+.notif-wrap input[type=text],
+.notif-wrap input[type=number],
+.notif-wrap input[type=date],
+.notif-wrap input[type=email],
+.notif-wrap textarea,
+.notif-wrap select{
+  border:2px solid #1b2140 !important;
+  border-radius:0 !important;
+  background:#fff !important;
+  box-shadow:2px 2px 0 #9aa;
+  font-family:inherit;
+  font-size:13px;
+}
+.notif-wrap input[type=text]:focus,
+.notif-wrap input[type=number]:focus,
+.notif-wrap input[type=date]:focus,
+.notif-wrap input[type=email]:focus,
+.notif-wrap textarea:focus,
+.notif-wrap select:focus{
+  outline:none;
+  border-color:var(--pit,#2b3a8f) !important;
+  box-shadow:2px 2px 0 var(--pit,#2b3a8f);
+}
+.notif-wrap input[type=checkbox]{
+  width:16px;height:16px;
+  accent-color:var(--pit,#2b3a8f);
+}
 .sync-panel .field{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .sync-panel .go{
   border-radius:10px;background:var(--fg);color:var(--bg);
@@ -4794,6 +4824,115 @@ function stEditSizeChart(ch){
   rHint.style.cssText='font-size:12px;color:var(--fg-dim,#555);margin-top:2px;';
   rHint.textContent='One row per measurement. Values go in the same order as the sizes above.';
   w.appendChild(rHint);
+
+  /* ── import: paste from a spreadsheet, or pick a .csv/.tsv/.xlsx file ── */
+  var impWrap=document.createElement('div');
+  impWrap.style.cssText='margin-top:8px;border:2px dashed #1b2140;padding:10px 12px;background:rgba(255,255,255,.5);';
+  var impTop=document.createElement('div');
+  impTop.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;';
+  impTop.innerHTML='<strong style="font-size:12px;">Import</strong><span style="color:var(--fg-dim,#555);">paste straight from the spreadsheet, or pick a file</span>';
+  var impFile=document.createElement('input'); impFile.type='file';
+  impFile.accept='.csv,.tsv,.txt,.xlsx,.xls';
+  impFile.style.cssText='font-size:12px;';
+  impTop.appendChild(impFile);
+  impWrap.appendChild(impTop);
+  var impText=document.createElement('textarea');
+  impText.placeholder='SIZE\\tS\\tM\\tL\\tXL\\nFRONT LENGTH (TOP NECK TO HEM)\\t67\\t68.5\\t70\\t72';
+  impText.style.cssText='display:block;width:100%;margin-top:8px;padding:6px;min-height:64px;box-sizing:border-box;';
+  impWrap.appendChild(impText);
+  var impBtn=document.createElement('button'); impBtn.className='act'; impBtn.textContent='Fill from pasted table';
+  impBtn.style.marginTop='8px';
+  impWrap.appendChild(impBtn);
+  var impMsg=document.createElement('span');
+  impMsg.style.cssText='margin-left:10px;font-size:12px;';
+  impWrap.appendChild(impMsg);
+  w.appendChild(impWrap);
+
+  function stSplitLine(line){
+    if(line.indexOf('\t')>-1) return line.split('\t');
+    var out=[], cur='', q=false;
+    for(var i=0;i<line.length;i++){
+      var c=line[i];
+      if(c==='"'){ if(q && line[i+1]==='"'){ cur+='"'; i++; } else q=!q; }
+      else if(c===',' && !q){ out.push(cur); cur=''; }
+      else cur+=c;
+    }
+    out.push(cur);
+    return out;
+  }
+  // A size chart is a grid: first row is the sizes, each later row is a measurement.
+  function stApplyGrid(grid){
+    grid = grid.map(function(r){ return r.map(function(c){ return (c==null?'':String(c)).trim(); }); })
+               .filter(function(r){ return r.some(function(c){ return c!==''; }); });
+    if(grid.length < 2) return 'Need a header row of sizes and at least one measurement row.';
+    var header = grid[0];
+    var newSizes = header.slice(1).filter(function(c){ return c!==''; });
+    if(!newSizes.length) return 'Could not find size names in the first row.';
+    var newRows = [];
+    for(var i=1;i<grid.length;i++){
+      var r=grid[i];
+      var label=(r[0]||'').trim();
+      if(!label) continue;
+      var vals=r.slice(1, 1+newSizes.length).map(function(v){
+        var n=parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+        return isNaN(n)?'':n;
+      });
+      if(!vals.some(function(v){ return v!==''; })) continue;
+      // "CHEST (PIT TO PIT, HALF)" → label + detail
+      var detail='';
+      var m=label.match(/^(.*?)\s*[\(\[]([^\)\]]+)[\)\]]\s*$/);
+      if(m){ label=m[1].trim(); detail=m[2].trim().toLowerCase(); }
+      newRows.push({ label:label, detail:detail, values:vals });
+    }
+    if(!newRows.length) return 'Found sizes but no measurement rows with numbers.';
+    sizes=newSizes;
+    rows=newRows;
+    fSizes.value=sizes.join(', ');
+    drawRows();
+    return null;
+  }
+  impBtn.onclick=function(){
+    var txt=impText.value.replace(/\r/g,'').trim();
+    if(!txt){ impMsg.textContent='Paste the table first.'; return; }
+    var err=stApplyGrid(txt.split('\n').map(stSplitLine));
+    impMsg.textContent = err || ('Filled '+rows.length+' measurements.');
+  };
+  impFile.onchange=function(){
+    var f=impFile.files && impFile.files[0];
+    if(!f) return;
+    impMsg.textContent='Reading…';
+    var isSheet=/\.xlsx?$/i.test(f.name);
+    if(!isSheet){
+      var fr=new FileReader();
+      fr.onload=function(){
+        var err=stApplyGrid(String(fr.result).replace(/\r/g,'').trim().split('\n').map(stSplitLine));
+        impMsg.textContent = err || ('Filled '+rows.length+' measurements.');
+      };
+      fr.readAsText(f);
+      return;
+    }
+    function parseXlsx(){
+      var fr=new FileReader();
+      fr.onload=function(){
+        try{
+          var wb=XLSX.read(new Uint8Array(fr.result), { type:'array' });
+          var ws=wb.Sheets[wb.SheetNames[0]];
+          var grid=XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'' });
+          var err=stApplyGrid(grid);
+          impMsg.textContent = err || ('Filled '+rows.length+' measurements.');
+        }catch(e){ impMsg.textContent='Could not read that file: '+(e.message||e); }
+      };
+      fr.readAsArrayBuffer(f);
+    }
+    if(window.XLSX) parseXlsx();
+    else{
+      var s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload=parseXlsx;
+      s.onerror=function(){ impMsg.textContent='Spreadsheet reader failed to load. Paste the table instead.'; };
+      document.head.appendChild(s);
+    }
+  };
 
   var rWrap=document.createElement('div'); rWrap.style.marginTop='8px'; w.appendChild(rWrap);
 
