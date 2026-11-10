@@ -2,14 +2,51 @@
 // GET /api/solis/join  ->  creates a Stripe Checkout session (subscription) on the Solis
 // connected account with GMC's application fee, then redirects the member to Stripe.
 // The Squarespace Join button is just a link to this URL.
+//
+// Link previews: when the URL is pasted into iMessage, WhatsApp, Slack etc. the preview
+// bot would otherwise follow the redirect and show "Stripe Checkout". Bots get a small
+// "Join Solis" page with Open Graph tags instead; people still go straight to Stripe.
 
 import { env, stripe, redirect, errorPage } from './_lib.js';
+
+const PREVIEW_BOTS = /facebookexternalhit|facebot|twitterbot|whatsapp|slackbot|discordbot|telegrambot|linkedinbot|iframely|embedly|applebot|googlebot|bingbot|pinterest|skypeuripreview|snapchat|redditbot|signal/i;
+
+function previewPage(req, res) {
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'personaldocket.com';
+  const base = 'https://' + host;
+  const title = 'Join Solis';
+  const desc = 'Solis gym membership: $25 a week, billed fortnightly. Sign up in a minute, cancel anytime.';
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=600');
+  res.end('<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="robots" content="noindex,nofollow">' +
+    '<title>' + title + '</title>' +
+    '<meta property="og:type" content="website">' +
+    '<meta property="og:site_name" content="Solis">' +
+    '<meta property="og:title" content="' + title + '">' +
+    '<meta property="og:description" content="' + desc + '">' +
+    '<meta property="og:url" content="' + base + '/api/solis/join">' +
+    '<meta property="og:image" content="' + base + '/solis/logo.png">' +
+    '<meta name="twitter:card" content="summary">' +
+    '<meta name="twitter:title" content="' + title + '">' +
+    '<meta name="twitter:description" content="' + desc + '">' +
+    '<meta name="twitter:image" content="' + base + '/solis/logo.png">' +
+    '<meta http-equiv="refresh" content="0;url=' + base + '/api/solis/join">' +
+    '</head><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1rem">' +
+    '<h1>' + title + '</h1><p>' + desc + '</p><p><a href="' + base + '/api/solis/join">Continue to sign up</a></p></body></html>');
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
     res.statusCode = 405;
     res.setHeader('Allow', 'GET, POST');
     return res.end('Method not allowed');
+  }
+
+  if (req.method === 'GET' && PREVIEW_BOTS.test(req.headers['user-agent'] || '')) {
+    return previewPage(req, res);
   }
 
   let cancelUrl = '';
