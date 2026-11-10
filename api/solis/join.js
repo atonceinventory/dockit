@@ -14,8 +14,8 @@ const PREVIEW_BOTS = /facebookexternalhit|facebot|twitterbot|whatsapp|slackbot|d
 function previewPage(req, res) {
   const host = req.headers['x-forwarded-host'] || req.headers.host || 'personaldocket.com';
   const base = 'https://' + host;
-  const title = 'Join Solis';
-  const desc = 'Solis gym membership: $25 a week, billed fortnightly. Sign up in a minute, cancel anytime.';
+  const title = 'Solis Membership';
+  const desc = '$25 a week, no lock-in. Join in under a minute.';
   res.statusCode = 200;
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=600');
