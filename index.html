@@ -5166,6 +5166,10 @@ function stRenderProducts(body){
       return ab;
     }
     card.appendChild(arrow(-1)); card.appendChild(arrow(1));
+    var dup=document.createElement('button'); dup.className='act'; dup.textContent='Duplicate';
+    dup.style.cssText='padding:2px 8px;';
+    dup.onclick=function(ev){ ev.stopPropagation(); stEditProduct(null, stDupeSeed(pr)); };
+    card.appendChild(dup);
     card.onclick=function(){ stEditProduct(pr); };
     grid.appendChild(card);
   });
@@ -5188,11 +5192,28 @@ function stPlainToHtml(t){
   return t.split(/\n{2,}/).map(function(par){ return '<p>'+esc(par).replace(/\n/g,'<br>')+'</p>'; }).join('\n');
 }
 
-function stEditProduct(pr){
+/* A duplicate keeps the look and the pricing but never the stock or the SKUs,
+   so a copy can never claim inventory that does not exist. */
+function stDupeSeed(src){
+  return {
+    handle:'',
+    title:((src.title||'')+' COPY').trim(),
+    descriptionHtml: src.descriptionHtml||'',
+    active:false,
+    images:(src.images||[]).slice(),
+    tags:(src.tags||[]).slice(),
+    variants:(src.variants||[]).map(function(v,i){
+      return { id:String(Date.now()+i), title:v.title||'OSFA', sku:'',
+               priceCents:v.priceCents||0, costCents:v.costCents||0, stock:0 };
+    })
+  };
+}
+function stEditProduct(pr, seed){
   ST.sub='editor';
   var isNew = !pr;
-  pr = pr || { handle:'', title:'', descriptionHtml:'', active:false, images:[],
+  pr = pr || seed || { handle:'', title:'', descriptionHtml:'', active:false, images:[],
                variants:[{ id:String(Date.now()), title:'OSFA', sku:'', priceCents:0, stock:0 }] };
+  if(!pr.variants || !pr.variants.length) pr.variants=[{ id:String(Date.now()), title:'OSFA', sku:'', priceCents:0, stock:0 }];
   var v = pr.variants[0];
 
   sheet.innerHTML='';
@@ -5353,7 +5374,20 @@ function stEditProduct(pr){
     });
     if(!variants.length) variants=[{ id:String(Date.now()), title:'OSFA', sku:'', priceCents:priceC, costCents:costC, stock:0 }];
     var tags=fTags.value.split(',').map(function(t){ return t.trim(); }).filter(Boolean);
+
+    // Two products must never share a name, and a new one must never land on
+    // an existing handle, which would silently merge into that product.
+    var mine=(pr.handle||'').toLowerCase();
+    var clash=ST.products.filter(function(p){
+      return (p.handle||'').toLowerCase()!==mine
+          && (p.title||'').trim().toLowerCase()===title.toLowerCase();
+    })[0];
+    if(clash){ msg.textContent='"'+clash.title+'" already exists. Give this one a different name.'; fTitle.focus(); return; }
+
     var handle=pr.handle||slugify(title);
+    if(isNew && ST.products.some(function(p){ return (p.handle||'')===handle; })){
+      msg.textContent='That name maps to the web address "'+handle+'", which is taken. Change the name.'; fTitle.focus(); return;
+    }
     var doc={
       handle:handle, title:title, descriptionHtml:stPlainToHtml(fDesc.value),
       active:cb.checked, images:pr.images||[],
@@ -5361,7 +5395,13 @@ function stEditProduct(pr){
       variants:variants,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    if(isNew) doc.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    if(isNew){
+      doc.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      // Newest to the top of the list, which is also the storefront order.
+      doc.sortOrder = ST.products.reduce(function(m,p){
+        var s=(p.sortOrder!=null?p.sortOrder:9999); return s<m?s:m;
+      }, 1) - 1;
+    }
     if(pr.migratedFromShopify) doc.migratedFromShopify = pr.migratedFromShopify;
     msg.textContent='Saving\u2026';
     fbDb.collection('pit_products').doc(handle).set(doc,{merge:true})
