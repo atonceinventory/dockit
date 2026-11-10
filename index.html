@@ -4582,7 +4582,7 @@ function renderGridPage(){
 }
 
 /* ═══ PIT Store — products + orders (Firestore collections) ═══ */
-var ST = { view:'products', products:[], orders:[], busy:false };
+var ST = { view:'products', products:[], orders:[], charts:[], busy:false };
 var ST_UNFUL = 0;
 function stCountUnfulfilled(){
   try{
@@ -4657,8 +4657,10 @@ function stLoad(cb){
   if(!isOwner() || !fbConfigured()){ cb('Owner sign-in required'); return; }
   Promise.all([
     fbDb.collection('pit_products').get(),
-    fbDb.collection('pit_orders').orderBy('order_number','desc').limit(50).get()
+    fbDb.collection('pit_orders').orderBy('order_number','desc').limit(50).get(),
+    fbDb.collection('pit_sizecharts').get().catch(function(){ return { docs:[] }; })
   ]).then(function(res){
+    ST.charts = (res[2] && res[2].docs ? res[2].docs : []).map(function(d){ var o=d.data(); o._id=d.id; return o; });
     ST.products = res[0].docs.map(function(d){ return d.data(); });
     ST.products.forEach(function(pr){
       var fixed=(pr.images||[]).map(stFixUrl);
@@ -4683,19 +4685,22 @@ function renderStorePage(){
   var bI=document.createElement('button'); bI.className='act'; bI.textContent='Inventory';
   var bC=document.createElement('button'); bC.className='act'; bC.textContent='Customers';
   var bF=document.createElement('button'); bF.className='act'; bF.textContent='Finance';
+  var bZ=document.createElement('button'); bZ.className='act'; bZ.textContent='Size charts';
   var bG=document.createElement('button'); bG.className='act'; bG.textContent='\u2699';
   bP.onclick=function(){ ST.view='products'; renderStorePage(); };
   bO.onclick=function(){ ST.view='orders'; renderStorePage(); };
   bI.onclick=function(){ ST.view='inventory'; renderStorePage(); };
   bC.onclick=function(){ ST.view='customers'; renderStorePage(); };
   bF.onclick=function(){ ST.view='finance'; renderStorePage(); };
+  bZ.onclick=function(){ ST.view='sizecharts'; renderStorePage(); };
   bG.onclick=stCfgPrompt;
   if(ST.view==='products') bP.setAttribute('aria-current','page');
   if(ST.view==='orders') bO.setAttribute('aria-current','page');
   if(ST.view==='inventory') bI.setAttribute('aria-current','page');
   if(ST.view==='customers') bC.setAttribute('aria-current','page');
   if(ST.view==='finance') bF.setAttribute('aria-current','page');
-  head.appendChild(bP); head.appendChild(bO); head.appendChild(bI); head.appendChild(bC); head.appendChild(bF); head.appendChild(bG);
+  if(ST.view==='sizecharts') bZ.setAttribute('aria-current','page');
+  head.appendChild(bP); head.appendChild(bO); head.appendChild(bI); head.appendChild(bC); head.appendChild(bF); head.appendChild(bZ); head.appendChild(bG);
   w.appendChild(head);
 
   var body=document.createElement('div'); body.id='stBody'; body.style.marginTop='12px';
@@ -4705,8 +4710,254 @@ function renderStorePage(){
 
   stLoad(function(err){
     if(err){ body.textContent='Store load failed: '+err; return; }
-    if(ST.view==='products') stRenderProducts(body); else if(ST.view==='inventory') stRenderInventory(body); else if(ST.view==='customers') stRenderCustomers(body); else if(ST.view==='finance') stRenderFinance(body); else stRenderOrders(body);
+    if(ST.view==='products') stRenderProducts(body); else if(ST.view==='inventory') stRenderInventory(body); else if(ST.view==='customers') stRenderCustomers(body); else if(ST.view==='finance') stRenderFinance(body); else if(ST.view==='sizecharts') stRenderSizeCharts(body); else stRenderOrders(body);
   });
+}
+
+/* ── size charts ── */
+function stChartSlug(name){
+  return (name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || ('chart-'+Date.now());
+}
+function stRenderSizeCharts(body){
+  body.innerHTML='';
+  var bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:flex-end;';
+  var add=document.createElement('button'); add.className='gmc-red'; add.textContent='+ New size chart';
+  add.onclick=function(){ stEditSizeChart(null); };
+  bar.appendChild(add); body.appendChild(bar);
+
+  if(!ST.charts.length){
+    var empty=document.createElement('div');
+    empty.style.cssText='margin-top:14px;font-size:13px;color:var(--fg-dim,#555);';
+    empty.textContent='No size charts yet. Create one, fill in the measurements, then tick the products it applies to.';
+    body.appendChild(empty);
+    return;
+  }
+
+  var grid=document.createElement('div'); grid.style.cssText='margin-top:12px;';
+  ST.charts.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  ST.charts.forEach(function(ch){
+    var card=document.createElement('div');
+    card.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--surface-2,#fff);border:1px solid var(--line,#b9bdd1);border-left:4px solid var(--pit, #2b3a8f);box-shadow:2px 2px 0 #9aa;padding:12px 14px;margin-top:10px;cursor:pointer;';
+    var nProd=(ch.products||[]).length;
+    var names=(ch.products||[]).map(function(h){
+      var p=ST.products.filter(function(x){ return x.handle===h; })[0];
+      return p?(p.title||h):h;
+    }).join(', ');
+    card.innerHTML =
+      '<span style="font-weight:700;flex:1 1 140px;min-width:0;">'+(ch.name||'(untitled)')+'</span>'+
+      '<span style="font-size:13px;">'+(ch.sizes||[]).join(' / ')+'</span>'+
+      '<span style="font-size:13px;">'+(ch.rows||[]).length+' rows</span>'+
+      '<span style="font-size:11px;letter-spacing:.08em;padding:2px 8px;background:'+(nProd?'#1e7a3c':'#8a5a00')+';color:#fff;">'+(nProd?nProd+' PRODUCT'+(nProd>1?'S':''):'UNUSED')+'</span>'+
+      (names?'<span style="flex:1 1 100%;font-size:12px;color:var(--fg-dim,#555);">'+names+'</span>':'');
+    card.onclick=function(){ stEditSizeChart(ch); };
+    grid.appendChild(card);
+  });
+  body.appendChild(grid);
+}
+
+function stEditSizeChart(ch){
+  ST.sub='chart';
+  var isNew = !ch;
+  ch = ch || { _id:'', name:'', title:'', intro:'', note:'', sizes:['S','M','L','XL'], rows:[], products:[] };
+
+  sheet.innerHTML='';
+  var w=document.createElement('div'); w.className='notif-wrap';
+  w.style.cssText='max-width:720px;margin:0 auto;';
+  w.innerHTML='<h2>'+(isNew?'New size chart':'Edit — '+(ch.name||''))+'</h2>';
+
+  function field(label, value, type, hint){
+    var l=document.createElement('label'); l.style.cssText='display:block;margin-top:10px;font-size:13px;font-weight:700;';
+    l.textContent=label;
+    var i=document.createElement(type==='area'?'textarea':'input');
+    if(type!=='area') i.type='text';
+    i.value=value||''; i.style.cssText='display:block;width:100%;margin-top:4px;padding:6px;border:1px solid #b9bdd1;box-sizing:border-box;'+(type==='area'?'min-height:70px;':'');
+    if(hint) i.placeholder=hint;
+    l.appendChild(i); w.appendChild(l);
+    return i;
+  }
+
+  var fName=field('Name (your label for it, e.g. Tee)', ch.name);
+  var fTitle=field('Heading shown on the site', ch.title, null, 'Tee size guide');
+  var fIntro=field('Intro line', ch.intro, 'area', 'Every figure is the garment measured flat, in centimetres.');
+  var fNote=field('Footnote', ch.note, 'area', 'Half measurements are across one side only.');
+  var fSizes=field('Sizes (comma separated)', (ch.sizes||[]).join(', '), null, 'S, M, L, XL');
+
+  var sizes = (ch.sizes||[]).slice();
+  var rows = (ch.rows||[]).map(function(r){
+    return { label:r.label||'', detail:r.detail||'', values:(r.values||[]).slice() };
+  });
+
+  var rLab=document.createElement('div'); rLab.style.cssText='margin-top:16px;font-size:13px;font-weight:700;';
+  rLab.textContent='Measurements';
+  w.appendChild(rLab);
+  var rHint=document.createElement('div');
+  rHint.style.cssText='font-size:12px;color:var(--fg-dim,#555);margin-top:2px;';
+  rHint.textContent='One row per measurement. Values go in the same order as the sizes above.';
+  w.appendChild(rHint);
+
+  var rWrap=document.createElement('div'); rWrap.style.marginTop='8px'; w.appendChild(rWrap);
+
+  function drawRows(){
+    rWrap.innerHTML='';
+    var headRow=document.createElement('div');
+    headRow.style.cssText='display:flex;gap:6px;align-items:center;font-size:11px;letter-spacing:.06em;color:var(--fg-dim,#555);margin-bottom:4px;';
+    headRow.innerHTML='<span style="flex:2 1 150px;">MEASUREMENT</span><span style="flex:2 1 130px;">DETAIL</span>'+
+      sizes.map(function(s){ return '<span style="flex:0 0 58px;text-align:center;">'+s+'</span>'; }).join('')+
+      '<span style="flex:0 0 28px;"></span>';
+    rWrap.appendChild(headRow);
+
+    rows.forEach(function(r, idx){
+      var line=document.createElement('div');
+      line.style.cssText='display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:nowrap;';
+      var inp=function(val, flex, ph){
+        var i=document.createElement('input'); i.type='text'; i.value=val==null?'':val;
+        i.placeholder=ph||'';
+        i.style.cssText='flex:'+flex+';min-width:0;padding:6px;border:1px solid #b9bdd1;box-sizing:border-box;';
+        return i;
+      };
+      var iLabel=inp(r.label,'2 1 150px','Chest');
+      var iDetail=inp(r.detail,'2 1 130px','pit to pit, half');
+      iLabel.oninput=function(){ r.label=iLabel.value; };
+      iDetail.oninput=function(){ r.detail=iDetail.value; };
+      line.appendChild(iLabel); line.appendChild(iDetail);
+      sizes.forEach(function(s, si){
+        var iv=inp(r.values[si],'0 0 58px','');
+        iv.style.textAlign='center';
+        iv.oninput=function(){ r.values[si]=iv.value; };
+        line.appendChild(iv);
+      });
+      var del=document.createElement('button'); del.className='act'; del.textContent='✕';
+      del.style.cssText='flex:0 0 28px;min-width:28px;padding:4px;';
+      del.onclick=function(){ rows.splice(idx,1); drawRows(); };
+      line.appendChild(del);
+      rWrap.appendChild(line);
+    });
+
+    var addRow=document.createElement('button'); addRow.className='act'; addRow.textContent='+ Add measurement';
+    addRow.style.marginTop='8px';
+    addRow.onclick=function(){ rows.push({ label:'', detail:'', values:sizes.map(function(){ return ''; }) }); drawRows(); };
+    rWrap.appendChild(addRow);
+  }
+
+  function syncSizes(){
+    var next = fSizes.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    if(!next.length) next=['S'];
+    rows.forEach(function(r){
+      var v=[];
+      for(var i=0;i<next.length;i++){
+        var oldIdx = sizes.indexOf(next[i]);
+        v.push(oldIdx>-1 ? (r.values[oldIdx]==null?'':r.values[oldIdx]) : '');
+      }
+      r.values=v;
+    });
+    sizes=next;
+    drawRows();
+  }
+  fSizes.onblur=syncSizes;
+  if(!sizes.length){ sizes=['S','M','L','XL']; }
+  if(!rows.length){ rows=[{ label:'', detail:'', values:sizes.map(function(){ return ''; }) }]; }
+  drawRows();
+
+  var pLab=document.createElement('div'); pLab.style.cssText='margin-top:18px;font-size:13px;font-weight:700;';
+  pLab.textContent='Products using this chart';
+  w.appendChild(pLab);
+  var pHint=document.createElement('div');
+  pHint.style.cssText='font-size:12px;color:var(--fg-dim,#555);margin-top:2px;';
+  pHint.textContent='A product can only belong to one chart. Ticking it here removes it from any other.';
+  w.appendChild(pHint);
+
+  var pWrap=document.createElement('div'); pWrap.style.cssText='margin-top:8px;';
+  var picked={};
+  (ch.products||[]).forEach(function(h){ picked[h]=true; });
+  ST.products.slice().sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); }).forEach(function(pr){
+    var owner=null;
+    ST.charts.forEach(function(c){
+      if(c._id!==ch._id && (c.products||[]).indexOf(pr.handle)>-1) owner=c.name||c._id;
+    });
+    var row=document.createElement('label');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--line,#e2e4ee);';
+    var cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!picked[pr.handle];
+    cb.onchange=function(){ picked[pr.handle]=cb.checked; };
+    row.appendChild(cb);
+    var nm=document.createElement('span'); nm.style.flex='1'; nm.textContent=pr.title||pr.handle;
+    row.appendChild(nm);
+    if(owner){
+      var tag=document.createElement('span');
+      tag.style.cssText='font-size:11px;color:var(--fg-dim,#777);';
+      tag.textContent='currently on '+owner;
+      row.appendChild(tag);
+    }
+    pWrap.appendChild(row);
+  });
+  w.appendChild(pWrap);
+
+  var msg=document.createElement('div'); msg.style.cssText='margin-top:12px;font-size:13px;min-height:18px;';
+
+  var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;';
+  var save=document.createElement('button'); save.className='gmc-red'; save.textContent='Save chart';
+  save.onclick=function(){
+    syncSizes();
+    var name=fName.value.trim();
+    if(!name){ msg.textContent='Give the chart a name.'; return; }
+    var clean=rows.filter(function(r){ return (r.label||'').trim(); }).map(function(r){
+      return {
+        label:r.label.trim(),
+        detail:(r.detail||'').trim(),
+        values:r.values.map(function(v){
+          var n=parseFloat(String(v).trim());
+          return isNaN(n) ? '' : n;
+        })
+      };
+    });
+    if(!clean.length){ msg.textContent='Add at least one measurement row.'; return; }
+    var id = ch._id || stChartSlug(name);
+    var chosen = Object.keys(picked).filter(function(h){ return picked[h]; });
+    var doc = {
+      name:name,
+      title:fTitle.value.trim() || (name+' size guide'),
+      intro:fIntro.value.trim(),
+      note:fNote.value.trim(),
+      sizes:sizes.slice(),
+      rows:clean,
+      products:chosen
+    };
+    save.disabled=true; msg.textContent='Saving…';
+    var chain = fbDb.collection('pit_sizecharts').doc(id).set(doc, { merge:true });
+    ST.charts.forEach(function(c){
+      if(c._id===id) return;
+      var keep=(c.products||[]).filter(function(h){ return chosen.indexOf(h)===-1; });
+      if(keep.length !== (c.products||[]).length){
+        chain = chain.then(function(){ return fbDb.collection('pit_sizecharts').doc(c._id).set({ products:keep }, { merge:true }); });
+      }
+    });
+    chain.then(function(){ ST.view='sizecharts'; renderStorePage(); })
+      .catch(function(e){ save.disabled=false; msg.textContent='Save failed: '+(e.message||e); });
+  };
+  btns.appendChild(save);
+
+  if(!isNew){
+    var del=document.createElement('button'); del.className='act'; del.textContent='Delete chart';
+    del.onclick=function(){
+      var ask = window.pitConfirm
+        ? window.pitConfirm((ch.name||'This chart')+' → DELETED',
+            'The size guide stops showing on any product using it. The products themselves are untouched.', 'Delete')
+        : Promise.resolve(confirm('Delete '+(ch.name||'this chart')+'? The size guide stops showing on any product using it.'));
+      ask.then(function(ok){
+        if(!ok) return;
+        fbDb.collection('pit_sizecharts').doc(ch._id).delete()
+          .then(function(){ ST.view='sizecharts'; renderStorePage(); })
+          .catch(function(e){ msg.textContent='Delete failed: '+(e.message||e); });
+      });
+    };
+    btns.appendChild(del);
+  }
+
+  var back=document.createElement('button'); back.className='act'; back.textContent='Back';
+  back.onclick=function(){ ST.view='sizecharts'; renderStorePage(); };
+  btns.appendChild(back);
+
+  w.appendChild(btns); w.appendChild(msg);
+  sheet.appendChild(w);
 }
 
 /* ── products ── */
