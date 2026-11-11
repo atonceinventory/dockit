@@ -3269,7 +3269,7 @@ function addTaskOnDate(iso){
 }
 
 /* ═══ Contacts — existing client address book (shared) ════ */
-function freshContactDraft(){ var k=(typeof S!=='undefined'&&S&&S.lane)||'gmc'; return {name:'',company:'',phone:'',email:'',biz:k,action:'',lane:k}; }
+function freshContactDraft(){ var k=(typeof S!=='undefined'&&S&&S.lane)||'gmc'; return {name:'',company:'',phone:'',email:'',biz:k,url:'',lane:k}; }
 var contactDraft=freshContactDraft();
 var contactEditId=null;
 
@@ -3665,10 +3665,10 @@ function renderContacts(){
   allowedLaneKeys().forEach(function(k){ var op=document.createElement('option'); op.value=k; op.textContent='For: '+(LANE[k]?LANE[k].code+' \u2013 '+LANE[k].name:k); if((contactDraft.biz||'gmc')===k) op.selected=true; bizSel.appendChild(op); });
   bizSel.onchange=function(){ contactDraft.biz=bizSel.value; };
   grid.appendChild(bizSel);
-  var actSel=document.createElement('select'); actSel.className='ct-in';
-  [['','Next action: none'],['Email','Next action: Email'],['Call','Next action: Call'],['Message','Next action: Message'],['Meet','Next action: Meet']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if((contactDraft.action||'')===o[0]) op.selected=true; actSel.appendChild(op); });
-  actSel.onchange=function(){ contactDraft.action=actSel.value; };
-  grid.appendChild(actSel);
+  var urlIn=document.createElement('input'); urlIn.className='ct-in'; urlIn.type='url'; urlIn.placeholder='URL'; urlIn.value=contactDraft.url||'';
+  urlIn.oninput=function(){ contactDraft.url=urlIn.value; };
+  urlIn.onkeydown=function(e){ if(e.key==='Enter') saveContact(); };
+  grid.appendChild(urlIn);
   form.appendChild(grid);
   var actions=document.createElement('div'); actions.className='ct-form-actions';
   var saveBtn=document.createElement('button'); saveBtn.className='ct-save'; saveBtn.textContent=contactEditId?'Save changes':'Add client';
@@ -3699,12 +3699,14 @@ function renderContacts(){
     var bits=[];
     if(c.phone) bits.push('<a href="tel:'+escapeHtml(c.phone)+'">'+escapeHtml(c.phone)+'</a>');
     if(c.email) bits.push('<a href="mailto:'+escapeHtml(c.email)+'">'+escapeHtml(c.email)+'</a>');
+    var href=contactUrlHref(c.url);
+    if(href) bits.push('<a href="'+escapeHtml(href)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(c.url.replace(/^https?:\/\//i,'').replace(/\/$/,''))+'</a>');
     meta.innerHTML=bits.join(' \u00b7 ')||'<span class="ct-none">No contact details</span>';
     info.appendChild(meta);
     row.appendChild(info);
     var acts=document.createElement('div'); acts.className='ct-card-acts';
     var edit=document.createElement('button'); edit.className='ct-edit'; edit.textContent='Edit';
-    edit.onclick=function(){ contactEditId=c.id; contactDraft={name:c.name||'',company:c.company||'',phone:c.phone||'',email:c.email||'',biz:c.biz||'gmc',action:c.action||''}; render(); window.scrollTo(0,0); };
+    edit.onclick=function(){ contactEditId=c.id; contactDraft={name:c.name||'',company:c.company||'',phone:c.phone||'',email:c.email||'',biz:c.biz||'gmc',url:c.url||''}; render(); window.scrollTo(0,0); };
     var del=document.createElement('button'); del.className='ct-x'; del.innerHTML='&#10005;'; del.title='Delete';
     del.onclick=function(){ if(confirm('Delete '+(c.name||'this contact')+'?')){ S.contacts=S.contacts.filter(function(x){return x.id!==c.id;}); saveLocal(); pushRemote(true); if(contactEditId===c.id){contactEditId=null;contactDraft=freshContactDraft();} render(); } };
     acts.appendChild(edit); acts.appendChild(del);
@@ -3714,6 +3716,11 @@ function renderContacts(){
   sheet.appendChild(list);
 }
 
+function contactUrlHref(u){
+  u=(u||'').trim(); if(!u) return '';
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(u)) u='https://'+u;
+  return /^https?:\/\//i.test(u)?u:'';
+}
 function contactTaskText(d){
   var t=d.action+' '+(d.name||'contact')+(d.company?(' \u2013 '+d.company):'');
   var detail = d.action==='Email' ? d.email : ((d.action==='Call'||d.action==='Message') ? d.phone : '');
@@ -3728,11 +3735,10 @@ function saveContact(){
   var d=contactDraft;
   if(contactEditId){
     var c=S.contacts.filter(function(x){return x.id===contactEditId;})[0];
-    if(c){ var prevAct=c.action||''; c.name=d.name; c.company=d.company; c.phone=d.phone; c.email=d.email; c.biz=d.biz||'gmc'; c.action=d.action||''; if(c.action && c.action!==prevAct) contactFollowUp(d); }
+    if(c){ c.name=d.name; c.company=d.company; c.phone=d.phone; c.email=d.email; c.biz=d.biz||'gmc'; c.url=(d.url||'').trim(); }
     contactEditId=null;
   } else {
-    S.contacts.push({id:uid(), lane:S.lane||'gmc', name:d.name, company:d.company, phone:d.phone, email:d.email, biz:d.biz||'gmc', action:d.action||''});
-    contactFollowUp(d);
+    S.contacts.push({id:uid(), lane:S.lane||'gmc', name:d.name, company:d.company, phone:d.phone, email:d.email, biz:d.biz||'gmc', url:(d.url||'').trim()});
   }
   contactDraft=freshContactDraft();
   saveLocal(); pushRemote(true); render();
