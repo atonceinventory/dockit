@@ -541,6 +541,8 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .pick-mark img{width:100%;height:100%;object-fit:cover}
 .pick-mark img.wide,.tile .mark img.wide,.lane-head .swatch img.wide{object-fit:contain;padding:7%;box-sizing:border-box;background:#fff}
 .pick-mark b{color:#fff;font-weight:800;font-size:17px}
+.undo{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:80;background:var(--ink);color:#fff;padding:9px 14px;display:flex;gap:14px;align-items:center;font-family:var(--mono);font-size:13px;box-shadow:3px 3px 0 rgba(20,22,50,.3)}
+.undo button{background:#fff;color:var(--ink);border:0;padding:4px 10px;font-weight:700;cursor:pointer;font-family:inherit}
 /* ── GMC Finance ── */
 .fin{max-width:1100px;margin:14px auto 40px;padding:0 var(--pad)}
 .fin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -1910,6 +1912,37 @@ document.getElementById('capdate').onclick=function(){
   openCal(pendingDue, function(iso){ pendingDue = iso; paintCapDate(); });
 };
 
+/* G tasks tagged with a business also live in that business as a linked twin */
+function twinOf(t){ if(!t||!t.link) return null; for(var i=0;i<S.tasks.length;i++){ if(S.tasks[i].id===t.link) return S.tasks[i]; } return null; }
+function makeTwin(t){
+  if(!t || t.lane!=='me' || !t.biz || !LANE[t.biz] || t.link) return;
+  var tw={ id:uid(), text:t.text, lane:t.biz, kind:t.kind||'task', biz:null, due:t.due||null, done:false, created:t.created||Date.now(), link:t.id };
+  t.link=tw.id; S.tasks.unshift(tw);
+}
+function syncTwin(t){ var tw=twinOf(t); if(tw){ tw.text=t.text; tw.due=t.due||null; } }
+/* ticking removes the task (and its twin) everywhere; a short Undo toast covers slips */
+function removeTask(t){
+  var ids=[t.id]; if(t.link) ids.push(t.link);
+  var gone=S.tasks.filter(function(x){ return ids.indexOf(x.id)!==-1; });
+  S.tasks=S.tasks.filter(function(x){ return ids.indexOf(x.id)===-1; });
+  return gone;
+}
+var _undoT=null;
+function undoToast(label, undoFn){
+  var old=document.getElementById('undo'); if(old) old.parentNode.removeChild(old); clearTimeout(_undoT);
+  if(!undoFn) return;
+  var d=document.createElement('div'); d.id='undo'; d.className='undo';
+  var sp=document.createElement('span'); sp.textContent=label||'Done'; d.appendChild(sp);
+  var b=document.createElement('button'); b.textContent='Undo';
+  b.onclick=function(){ if(d.parentNode) d.parentNode.removeChild(d); undoFn(); };
+  d.appendChild(b); document.body.appendChild(d);
+  _undoT=setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); }, 6000);
+}
+function tickTask(t){
+  var gone=removeTask(t); save(); render();
+  undoToast('Done', function(){ gone.forEach(function(x){ S.tasks.unshift(x); }); save(); render(); });
+}
+
 function add(text){
   text = text.trim();
   if(!text) return;
@@ -1928,10 +1961,11 @@ function add(text){
   text = pd.text;
   if(!text) return;
   var due = pd.due || pendingDue;
-  S.tasks.unshift({
+  var nt={
     id:uid(), text:text, lane:lane, kind:S.kind, biz:(lane==='me'?biz:null),
     due: due, done:false, created:Date.now()
-  });
+  };
+  S.tasks.unshift(nt); makeTwin(nt);
   pendingDue = null; paintCapDate();
   save(); render();
 }
@@ -2054,7 +2088,7 @@ function openCal(current, onPick){
 }
 
 function setDue(t){
-  openCal(t.due, function(iso){ t.due = iso; save(); render(); });
+  openCal(t.due, function(iso){ t.due = iso; syncTwin(t); save(); render(); });
 }
 
 function dueChip(t){
@@ -2067,7 +2101,7 @@ function dueChip(t){
     c.onclick=function(e){ e.stopPropagation(); setDue(t); };
     var x=document.createElement('button');
     x.className='due-x'; x.innerHTML='&#10005;'; x.title='Clear date';
-    x.onclick=function(e){ e.stopPropagation(); t.due=null; save(); render(); };
+    x.onclick=function(e){ e.stopPropagation(); t.due=null; syncTwin(t); save(); render(); };
     wrap.appendChild(c); wrap.appendChild(x);
   }else{
     var add=document.createElement('button');
@@ -2095,11 +2129,7 @@ function taskRow(t){
     var box=document.createElement('button');
     box.className='box'; box.setAttribute('aria-label', t.done?'Mark not done':'Mark done');
     box.innerHTML='<span>&#10005;</span>';
-    box.onclick=function(){
-      t.done=!t.done;
-      t.completed = t.done ? Date.now() : null;
-      save(); render();
-    };
+    box.onclick=function(){ tickTask(t); };
     row.appendChild(box);
   }
 
@@ -2116,6 +2146,7 @@ function taskRow(t){
   if(t.lane==='me' && t.biz && LANE[t.biz]){
     var bz=document.createElement('span'); bz.className='me-biz'; bz.textContent=LANE[t.biz].code; bz.style.background=LANE[t.biz].full; if(t.biz==='cb'){ bz.style.color='#1c1f4a'; bz.style.border='1px solid #6a6d82'; } meta.appendChild(bz);
   }
+  if(t.lane!=='me' && t.link){ var gz=document.createElement('span'); gz.className='me-biz'; gz.textContent='G'; gz.style.background='var(--me)'; meta.appendChild(gz); }
   meta.appendChild(dueChip(t));
   // checklist progress
   if(!isNote && t.subs && t.subs.length){
@@ -2173,7 +2204,7 @@ function openDetail(t){
     var title=document.createElement('textarea'); title.className='detail-title'; title.rows=1;
     title.value=t.text;
     function autosize(){ title.style.height='auto'; title.style.height=title.scrollHeight+'px'; }
-    title.oninput=function(){ t.text=title.value; autosize(); saveQuiet(); };
+    title.oninput=function(){ t.text=title.value; syncTwin(t); autosize(); saveQuiet(); };
     sheet.appendChild(title); setTimeout(autosize,0);
 
     var drow=document.createElement('div'); drow.className='detail-row';
@@ -2182,12 +2213,12 @@ function openDetail(t){
     db.innerHTML='<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>';
     var dlab=document.createElement('span'); dlab.textContent = t.due ? fmtDue(t.due).label : 'Add date';
     db.appendChild(dlab);
-    db.onclick=function(){ openCal(t.due, function(iso){ t.due=iso; saveQuiet(); draw(); }); };
+    db.onclick=function(){ openCal(t.due, function(iso){ t.due=iso; syncTwin(t); saveQuiet(); draw(); }); };
     drow.appendChild(db);
     // done toggle
     var dn=document.createElement('button'); dn.className='db done-toggle'+(t.done?' on':'');
     dn.textContent = t.done ? '\u2713 Done' : 'Mark done';
-    dn.onclick=function(){ t.done=!t.done; t.completed=t.done?Date.now():null; saveQuiet(); draw(); };
+    dn.onclick=function(){ close(); tickTask(t); };
     drow.appendChild(dn);
     sheet.appendChild(drow);
 
@@ -2198,7 +2229,7 @@ function openDetail(t){
     t.subs.forEach(function(s){
       var item=document.createElement('div'); item.className='check-item'+(s.done?' done':'');
       var cb=document.createElement('button'); cb.className='check-box'; cb.innerHTML='<span>&#10003;</span>';
-      cb.onclick=function(){ s.done=!s.done; saveQuiet(); draw(); };
+      cb.onclick=function(){ var idx=t.subs.indexOf(s); if(idx>-1) t.subs.splice(idx,1); saveQuiet(); draw(); undoToast('Done', function(){ t.subs.splice(Math.min(idx,t.subs.length),0,s); saveQuiet(); render(); }); };
       var tx=document.createElement('input'); tx.className='check-txt'; tx.value=s.text;
       tx.oninput=function(){ s.text=tx.value; saveQuiet(); };
       tx.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); addInput.focus(); } };
@@ -2225,7 +2256,7 @@ function openDetail(t){
     var del=document.createElement('button'); del.className='detail-delete'; del.textContent='Delete task';
     del.onclick=function(){
       if(confirm('Delete this task and its checklist?')){
-        S.tasks=S.tasks.filter(function(x){return x.id!==t.id;});
+        removeTask(t);
         close();
       }
     };
@@ -2247,7 +2278,7 @@ function editTask(t, node){
   function done(){
     var v=inp.value.trim();
     if(v) t.text=v;
-    save(); render();
+    syncTwin(t); save(); render();
   }
   inp.onblur=done;
   inp.onkeydown=function(e){ if(e.key==='Enter'){e.preventDefault();inp.blur();} if(e.key==='Escape'){inp.value=t.text;inp.blur();} };
@@ -2559,7 +2590,7 @@ function projectBlock(p){
     if(ad) return -1;
     if(bd) return 1;
     return a.i-b.i;
-  }).map(function(x){ return x.t; });
+  }).map(function(x){ return x.t; }).filter(function(t){ return t.status!=='complete'; });
   sortedTasks.forEach(function(t){ list.appendChild(projectTaskCard(p,t)); });
   block.appendChild(list);
 
@@ -2603,7 +2634,7 @@ function projectTaskCard(p,t){
   // complete toggle
   var chk=document.createElement('button'); chk.className='pj2-chk'+(t.status==='complete'?' on':'');
   chk.innerHTML=t.status==='complete'?'&#10003;':'';
-  chk.onclick=function(){ t.status=(t.status==='complete'?'notstarted':'complete'); save(); render(); };
+  chk.onclick=function(){ var prev=t.status; t.status='complete'; save(); render(); undoToast('Done', function(){ t.status=prev||'notstarted'; save(); render(); }); };
   card.appendChild(chk);
 
   // title (click opens notes; still editable)
@@ -3259,7 +3290,7 @@ function addTaskOnDate(iso){
   var acts=document.createElement('div'); acts.className='tm-acts';
   var cancel=document.createElement('button'); cancel.className='tm-cancel'; cancel.textContent='Cancel'; cancel.onclick=close;
   var addb=document.createElement('button'); addb.className='tm-add'; addb.textContent='Add task';
-  function commit(){ var text=(inp.value||'').trim(); if(!text){ close(); return; } S.tasks.unshift({ id:uid(), text:text, lane:(S.lane||'gmc'), kind:'task', due:iso, done:false, created:Date.now() }); close(); save(); render(); }
+  function commit(){ var text=(inp.value||'').trim(); if(!text){ close(); return; } var nl=(S.lane||'gmc'), nb=(nl==='me'&&S.meBiz&&S.meBiz!=='all'&&S.meBiz!=='none')?S.meBiz:null; var nt={ id:uid(), text:text, lane:nl, kind:'task', biz:nb, due:iso, done:false, created:Date.now() }; S.tasks.unshift(nt); makeTwin(nt); close(); save(); render(); }
   addb.onclick=commit;
   inp.onkeydown=function(e){ if(e.key==='Enter') commit(); };
   acts.appendChild(cancel); acts.appendChild(addb);
