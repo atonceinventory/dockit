@@ -3660,6 +3660,7 @@ function renderContacts(){
   [['name','Name'],['company','Company'],['phone','Phone'],['email','Email']].forEach(function(f){
     var inp=document.createElement('input'); inp.className='ct-in'; inp.placeholder=f[1]; inp.value=contactDraft[f[0]]||'';
     if(f[0]==='phone') inp.type='tel'; if(f[0]==='email') inp.type='email';
+    if(f[0]==='name'){ inp.autocapitalize='words'; inp.onblur=function(){ inp.value=contactDraft.name=properName(inp.value); }; }
     inp.oninput=function(){ contactDraft[f[0]]=inp.value; };
     inp.onkeydown=function(e){ if(e.key==='Enter') saveContact(); };
     grid.appendChild(inp);
@@ -3741,6 +3742,9 @@ function renderContacts(){
   drawList();
 }
 
+function properName(n){
+  return (n||'').replace(/\s+/g,' ').trim().toLowerCase().replace(/(^|[\s\-'\u2019])([a-z\u00e0-\u00ff])/g,function(m,a,b){ return a+b.toUpperCase(); });
+}
 function contactUrlHref(u){
   u=(u||'').trim(); if(!u) return '';
   if(!/^[a-z][a-z0-9+.-]*:/i.test(u)) u='https://'+u;
@@ -3757,7 +3761,7 @@ function contactFollowUp(d){
   S.tasks.unshift({ id:uid(), text:contactTaskText(d), lane:(d.biz||'gmc'), kind:'task', due:null, done:false, created:Date.now() });
 }
 function saveContact(){
-  var d=contactDraft;
+  var d=contactDraft; d.name=properName(d.name);
   if(contactEditId){
     var c=S.contacts.filter(function(x){return x.id===contactEditId;})[0];
     if(c){ c.name=d.name; c.company=d.company; c.phone=d.phone; c.email=d.email; c.biz=d.biz||'gmc'; c.url=(d.url||'').trim(); }
