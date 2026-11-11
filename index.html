@@ -592,6 +592,17 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .fin-gst-line b{font-size:18px;margin-right:4px}
 .fin-bar{height:12px;background:rgba(30,35,82,.14);border:1px solid #6a6d82;margin:8px 0}
 .fin-bar div{height:100%;background:#1e7a3c;transition:width .3s}
+.fin-goal{border-left:6px solid var(--gmc)}
+.fin-goal .fin-head{margin-bottom:4px}
+.fin-goal .fin-head .fin-ch{margin-bottom:0}
+.fin-goal-row{margin-top:10px}
+.fin-goal-row .fin-bar{position:relative;background:rgba(30,35,82,.14)}
+.fin-goal-row .fin-bar div{background:#a32222}
+.fin-goal-row.ok .fin-bar div{background:#c78a00}
+.fin-goal-row.hit .fin-bar div{background:#1e7a3c}
+.fin-pace{position:absolute;top:-4px;bottom:-4px;width:2px;background:#1c1f4a;margin-left:-1px}
+.fin-goal-name{display:inline-block;min-width:54px;font-weight:700}
+.fin-goal-biz{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
 .fin-gst.near .fin-bar div{background:#c78a00}
 .fin-gst.hit .fin-bar div{background:#a32222}
 .fin-gst-msg{font-size:12.5px;color:var(--fg-mut);line-height:1.5}
@@ -3456,6 +3467,45 @@ function finBasDue(q){ /* standard quarterly BAS lodgement: 28 days after quarte
   var e=new Date(q.end); var y=e.getUTCFullYear(), m=e.getUTCMonth();
   return (m===0) ? Date.UTC(y,1,28) : Date.UTC(y,m,28);
 }
+function finGoalCard(d){
+  var goal=Number(S.gmcGoalEach)||90000, t=d.totals;
+  var fyStart=Date.UTC(d.fy.year,6,1), fyEnd=Date.UTC(d.fy.year+1,6,1), now=Date.now();
+  var elapsed=Math.min(1,Math.max(0,(now-fyStart)/(fyEnd-fyStart)));
+  var monthsIn=Math.max(1/30, elapsed*12), monthsLeft=Math.max(0,12-elapsed*12);
+  var card=document.createElement('div'); card.className='fin-card fin-goal';
+  var head=document.createElement('div'); head.className='fin-head';
+  var h=document.createElement('div'); h.className='fin-ch'; h.textContent='Income goal · '+finMoney(goal)+' each this FY'; head.appendChild(h);
+  var ed=document.createElement('button'); ed.className='act'; ed.textContent='Edit goal'; ed.style.cssText='font-size:11px;padding:4px 9px;';
+  ed.onclick=function(){
+    var inp=document.createElement('input'); inp.type='number'; inp.min='0'; inp.step='1000'; inp.value=goal; inp.style.cssText='width:110px;padding:4px 6px;border:1px solid #6a6d82;font:inherit;';
+    var ok=document.createElement('button'); ok.className='act'; ok.textContent='Save'; ok.style.cssText='font-size:11px;padding:4px 9px;margin-left:6px;';
+    ok.onclick=function(){ var v=parseFloat(inp.value); if(v>0){ S.gmcGoalEach=v; save(); } render(); };
+    inp.onkeydown=function(e){ if(e.key==='Enter') ok.click(); if(e.key==='Escape') render(); };
+    head.replaceChild(inp, ed); head.appendChild(ok); inp.focus(); inp.select();
+  };
+  head.appendChild(ed); card.appendChild(head);
+  function row(name, got){
+    var pct=Math.min(100, Math.round(100*got/goal)), pace=goal*elapsed, proj=got/monthsIn*12, need=monthsLeft>0?Math.max(0,(goal-got)/monthsLeft):0;
+    var r=document.createElement('div'); r.className='fin-goal-row'+(got>=goal?' hit':(got>=pace?' ok':''));
+    var line=document.createElement('div'); line.className='fin-gst-line';
+    var nm=document.createElement('span'); nm.className='fin-goal-name'; nm.textContent=name; line.appendChild(nm);
+    var b=document.createElement('b'); b.textContent=finMoney(got); line.appendChild(b);
+    line.appendChild(document.createTextNode(' of '+finMoney(goal)+' ('+pct+'%)'));
+    r.appendChild(line);
+    var bar=document.createElement('div'); bar.className='fin-bar'; var fill=document.createElement('div'); fill.style.width=pct+'%'; bar.appendChild(fill);
+    var mk=document.createElement('span'); mk.className='fin-pace'; mk.style.left=Math.round(elapsed*100)+'%'; mk.title='On-pace mark for today: '+finMoney(pace); bar.appendChild(mk); r.appendChild(bar);
+    var sub=document.createElement('div'); sub.className='fin-gst-msg';
+    sub.textContent = got>=goal ? 'Goal reached.' : ('On pace for '+finMoney(proj)+' this FY at the current rate'+(monthsLeft>0.5?' · needs '+finMoney(need)+' a month from here to hit it':'')+'. Pace mark is where '+finMoney(goal)+' would be today.');
+    r.appendChild(sub);
+    return r;
+  }
+  card.appendChild(row('Griff', t.shareEach));
+  card.appendChild(row('Holly', t.shareEach));
+  var biz=document.createElement('div'); biz.className='fin-gst-msg fin-goal-biz';
+  biz.textContent='Business: '+finMoney(t.net)+' net profit of the '+finMoney(goal*2)+' needed to pay '+finMoney(goal)+' each · '+Math.round(elapsed*100)+'% of the financial year gone.';
+  card.appendChild(biz);
+  return card;
+}
 function finGstCard(d){
   var qs=finQuarters(d), now=Date.now();
   var card=document.createElement('div'); card.className='fin-card fin-gst';
@@ -3529,6 +3579,7 @@ function renderFinance(){
   tiles.appendChild(tile('Outstanding', finMoney(t.outstanding), 'invoiced, not yet paid'));
   tiles.appendChild(tile('GST owing', finMoney(t.gstNet), finMoney(t.gstCollected)+' collected − '+finMoney(t.gstPaid)+' paid'));
   w.appendChild(tiles);
+  w.appendChild(finGoalCard(d));
   (function(){ var now=Date.now(); finQuarters(d).forEach(function(q){ var due=finBasDue(q), days=Math.ceil((due-now)/86400000); if(q.hasData && !q.current && now>=q.end && days>=0 && days<=21 && q.gst.net>0){ var gb=document.createElement('div'); gb.className='fin-warn'; gb.textContent='BAS due '+new Date(due).toLocaleDateString('en-AU',{day:'numeric',month:'long'})+' ('+days+' day'+(days===1?'':'s')+'): '+finMoney(q.gst.net,2)+' net GST payable for '+q.label+'.'; w.appendChild(gb); } }); })();
 
   var charts=document.createElement('div'); charts.className='fin-charts';
