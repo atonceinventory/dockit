@@ -3642,6 +3642,9 @@ function renderContacts(){
   sheet.innerHTML='';
   var head=document.createElement('div'); head.className='proj-head';
   var h=document.createElement('h2'); h.textContent='Contacts';
+  var fixed=false;
+  (S.contacts||[]).forEach(function(c){ var n=properName(c.name); if(n!==(c.name||'')){ c.name=n; fixed=true; } });
+  if(fixed){ saveLocal(); pushRemote(true); }
   if(!contactEditId && contactDraft.lane!==(S.lane||'gmc')) contactDraft=freshContactDraft();
   var myContacts=laneItems(S.contacts);
   var sub=document.createElement('span'); sub.className='sub'; sub.textContent=myContacts.length+(myContacts.length===1?' client':' clients');
