@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Welcome to Solis</title>
+<link rel="icon" href="/solis/logo.png">
+<style>
+  :root { --bg: #f6f5f2; --card: #ffffff; --ink: #1c1b19; --muted: #6b6862; --line: #e4e1db; --accent: #1c1b19; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141413; --card: #1e1d1b; --ink: #f1efea; --muted: #a29e96; --line: #2f2d2a; --accent: #f1efea; }
+    .logo { filter: invert(1); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .card { max-width: 440px; margin: 12vh auto 0; padding: 28px 24px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 14px; }
+  .logo { display: block; width: 64px; height: 64px; object-fit: contain; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { margin: 0 0 14px; color: var(--muted); }
+  ul { margin: 0 0 18px; padding-left: 18px; color: var(--muted); }
+  li { margin-bottom: 6px; }
+  .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; text-decoration: none;
+    background: var(--accent); color: var(--bg); font-weight: 600; }
+  .foot { margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .foot a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="card">
+  <img class="logo" src="/solis/logo.png" alt="Solis" onerror="this.remove()">
+  <h1>You're in. Welcome to Solis.</h1>
+  <p>Your membership is active. A receipt is on its way to your email.</p>
+  <ul>
+    <li>$25 a week, charged as $50 every two weeks to the payment method you just used.</li>
+    <li>Update your card, see receipts or cancel anytime from <a href="/api/solis/manage">Manage my membership</a>.</li>
+    <li>Questions? Ask Dom at the gym or email <a href="mailto:info@solisperth.com.au">info@solisperth.com.au</a>.</li>
+  </ul>
+  <a class="btn" href="https://www.solisperth.com.au">Back to Solis</a>
+  <div class="foot">Solis Health &amp; Wellness, 9 Axon Street, Subiaco</div>
+</div>
+</body>
+</html>
