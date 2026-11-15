@@ -215,7 +215,8 @@ onAuthStateChanged(auth, user => {
   if (!user) { show('signin'); return; }
   $('who').textContent = 'Signed in as ' + user.email;
   unsub = onSnapshot(collection(db, 'members'), snap => {
-    members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Live members only: anything written by a Stripe test-mode (sandbox) event never shows here.
+    members = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.livemode === true);
     show('app');
     render();
   }, err => {

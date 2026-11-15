@@ -119,6 +119,12 @@ export default async function handler(req, res) {
 
   const account = env('SOLIS_STRIPE_ACCOUNT');
   res.setHeader('Content-Type', 'application/json');
+  // Only live events write to the members list once the platform key is live.
+  const liveKey = env('SOLIS_STRIPE_SECRET_KEY').indexOf('_live_') !== -1;
+  if (liveKey && event.livemode === false) {
+    res.statusCode = 200;
+    return res.end(JSON.stringify({ ignored: 'test event' }));
+  }
   if (event.account !== account) {
     // Another connected account (or a platform event). Acknowledge and ignore.
     res.statusCode = 200;
