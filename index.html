@@ -3509,6 +3509,61 @@ function sigList(title, items, valKey, emptyMsg, fmt){
   });
   c.appendChild(ul); return c;
 }
+var BOT = { data:null, at:0, loading:false, error:null };
+function botLoad(force){
+  if(BOT.loading) return;
+  if(!force && BOT.data && Date.now()-BOT.at < 30*60*1000) return;
+  if(!fbUser) return;
+  BOT.loading=true; BOT.error=null;
+  fbUser.getIdToken().then(function(t){ return fetch('/api/gmc/bots', { headers:{ Authorization:'Bearer '+t } }); })
+  .then(function(r){ return r.json().then(function(d){ if(!r.ok||!d.ok) throw new Error(d.error||('HTTP '+r.status)); return d; }); })
+  .then(function(d){ BOT.data=d; BOT.at=Date.now(); BOT.loading=false; if(S.page==='signals') render(); })
+  .catch(function(e){ BOT.loading=false; BOT.error=e.message||String(e); BOT.at=Date.now(); if(S.page==='signals') render(); });
+}
+function botTable(cols, rows){
+  var t=document.createElement('table'); t.className='fin-table';
+  var th=document.createElement('thead'), hr=document.createElement('tr');
+  cols.forEach(function(c){ var e=document.createElement('th'); e.textContent=c; hr.appendChild(e); });
+  th.appendChild(hr); t.appendChild(th);
+  var tb=document.createElement('tbody');
+  rows.forEach(function(r){ var tr=document.createElement('tr'); r.forEach(function(v){ var e=document.createElement('td'); e.textContent=v; tr.appendChild(e); }); tb.appendChild(tr); });
+  t.appendChild(tb); return t;
+}
+function sigBotCards(w){
+  var d=BOT.data;
+  function card(title){ var c=document.createElement('div'); c.className='sig-card'; var h=document.createElement('div'); h.className='sig-ch'; h.textContent=title; c.appendChild(h); w.appendChild(c); return c; }
+  if(!d){
+    var c1=card('Bot traffic'); var m=document.createElement('div'); m.className='sig-empty';
+    m.textContent=BOT.loading?'Loading bot and geo data…':(BOT.error||'Loading…'); c1.appendChild(m);
+    var c2=card('Geo sessions'); var m2=document.createElement('div'); m2.className='sig-empty'; m2.textContent=m.textContent; c2.appendChild(m2);
+    if(!BOT.loading && !BOT.error) botLoad(false);
+    else if(BOT.error && Date.now()-BOT.at > 5*60*1000) botLoad(true);
+    return;
+  }
+  if(d.configured===false){
+    var wn=document.createElement('div'); wn.className='fin-warn';
+    wn.appendChild(document.createTextNode('Bot traffic and geo sessions are not connected yet. Add '));
+    var cd=document.createElement('code'); cd.textContent=d.missing.join(', '); wn.appendChild(cd);
+    wn.appendChild(document.createTextNode(' in Vercel (Docket project > Settings > Environment Variables), using an API token from the gm-charlie.com Clarity project (Settings > Data Export), then redeploy.'));
+    w.appendChild(wn); return;
+  }
+  var t=d.totals;
+  var bc=card('Bot traffic');
+  var tiles=document.createElement('div'); tiles.className='sig-tiles';
+  function tile(l,v,sub){ var x=document.createElement('div'); x.className='sig-tile'; var a=document.createElement('div'); a.className='sig-tl'; a.textContent=l; var b=document.createElement('div'); b.className='sig-tv'; b.textContent=v; x.appendChild(a); x.appendChild(b); if(sub){ var c=document.createElement('div'); c.className='sig-delta flat'; c.textContent=sub; x.appendChild(c); } return x; }
+  tiles.appendChild(tile('Bot sessions', sigNum(t.bots), 'last '+d.windowDays+' days'));
+  tiles.appendChild(tile('Bot share', t.botPct.toFixed(1)+'%', sigNum(t.sessions)+' total sessions'));
+  tiles.appendChild(tile('Human sessions', sigNum(t.humans), 'bots excluded'));
+  bc.appendChild(tiles);
+  var sh=document.createElement('div'); sh.className='sig-ch'; sh.style.marginTop='14px'; sh.textContent='Bot sessions by source'; bc.appendChild(sh);
+  var srows=d.sources.filter(function(r){ return r.bots>0; });
+  if(!srows.length){ var e=document.createElement('div'); e.className='sig-empty'; e.textContent='No bot sessions detected in this window.'; bc.appendChild(e); }
+  else bc.appendChild(botTable(['Source','Bot sessions','All sessions','Bot %'], srows.map(function(r){ return [r.name, sigNum(r.bots), sigNum(r.sessions), (r.sessions?r.bots/r.sessions*100:0).toFixed(0)+'%']; })));
+  var gc=card('Geo sessions');
+  if(!d.geo.length){ var e2=document.createElement('div'); e2.className='sig-empty'; e2.textContent='No session data yet.'; gc.appendChild(e2); }
+  else gc.appendChild(botTable(['Country','Sessions','Human','Bot','Bot %'], d.geo.map(function(r){ return [r.name, sigNum(r.sessions), sigNum(r.humans), sigNum(r.bots), (r.sessions?r.bots/r.sessions*100:0).toFixed(0)+'%']; })));
+  var up=document.createElement('div'); up.className='sig-sub'; up.textContent='Source: Microsoft Clarity, last '+d.windowDays+' days (its maximum), refreshed about every 4 hours. Updated '+new Date(d.updatedAt).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+'.'; gc.appendChild(up);
+}
 function sigReferralCard(d){
   var c=document.createElement('div'); c.className='sig-card';
   var h=document.createElement('div'); h.className='sig-ch'; h.textContent='Referral traffic'; c.appendChild(h);
@@ -3605,6 +3660,7 @@ function renderSignals(){
   g1.appendChild(sigList('Traffic sources', d.referrers.slice(0,10), 'visitors', 'No referrers yet.', function(n){ return n==='(none)'?'Direct / none':n; }));
   w.appendChild(g1);
   w.appendChild(sigReferralCard(d));
+  sigBotCards(w);
   var g2=document.createElement('div'); g2.className='sig-grid2';
   g2.appendChild(sigList('Visitors by country', d.countries, 'visitors', 'No country data yet.'));
   g2.appendChild(sigList('Visitors by device', d.devices, 'visitors', 'No device data yet.'));
