@@ -135,16 +135,17 @@ export default async function handler(req, res) {
   const prev = { since: iso(prevSince), until: iso(prevUntil) };
 
   try {
-    const [curDaily, prevDaily, curTotal, prevTotal, pages, refs, countries, devices, events] = await Promise.allSettled([
+    const [curDaily, prevDaily, curTotal, prevTotal, pages, refs, countries, devices, events, refsPrev] = await Promise.allSettled([
       query('visits/aggregate', Object.assign({ by: 'day' }, cur)),
       query('visits/aggregate', Object.assign({ by: 'day' }, prev)),
       query('visits/aggregate', cur),
       query('visits/aggregate', prev),
       query('visits/aggregate', Object.assign({ by: 'requestPath', limit: 10 }, cur)),
-      query('visits/aggregate', Object.assign({ by: 'referrerHostname', limit: 10 }, cur)),
+      query('visits/aggregate', Object.assign({ by: 'referrerHostname', limit: 25 }, cur)),
       query('visits/aggregate', Object.assign({ by: 'country', limit: 8 }, cur)),
       query('visits/aggregate', Object.assign({ by: 'deviceType', limit: 5 }, cur)),
-      query('events/aggregate', Object.assign({ by: 'eventName', limit: 10 }, cur))
+      query('events/aggregate', Object.assign({ by: 'eventName', limit: 10 }, cur)),
+      query('visits/aggregate', Object.assign({ by: 'referrerHostname', limit: 25 }, prev))
     ]);
 
     // The daily query is the one we cannot do without: surface its error.
@@ -164,6 +165,7 @@ export default async function handler(req, res) {
       daily: { current: curRows, previous: prevRows },
       pages: dim(val(pages), 'requestPath'),
       referrers: dim(val(refs), 'referrerHostname'),
+      referrersPrev: dim(val(refsPrev), 'referrerHostname'),
       countries: dim(val(countries), 'country'),
       devices: dim(val(devices), 'deviceType'),
       events: rows(val(events)).map(function (r) { return { name: String(r.eventName || '(unnamed)'), count: num(r.count), visitors: num(r.visitors) }; }),

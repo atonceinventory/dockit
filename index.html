@@ -3509,6 +3509,36 @@ function sigList(title, items, valKey, emptyMsg, fmt){
   });
   c.appendChild(ul); return c;
 }
+function sigReferralCard(d){
+  var c=document.createElement('div'); c.className='sig-card';
+  var h=document.createElement('div'); h.className='sig-ch'; h.textContent='Referral traffic'; c.appendChild(h);
+  var cur=(d.referrers||[]).filter(function(r){ return r.name!=='(none)'; });
+  var prevMap={}; (d.referrersPrev||[]).forEach(function(r){ prevMap[r.name]=r.visitors; });
+  var all=(d.referrers||[]).reduce(function(a,r){ return a+r.visitors; },0);
+  var ref=cur.reduce(function(a,r){ return a+r.visitors; },0);
+  var prevRef=(d.referrersPrev||[]).filter(function(r){ return r.name!=='(none)'; }).reduce(function(a,r){ return a+r.visitors; },0);
+  if(!cur.length){ var e=document.createElement('div'); e.className='sig-empty'; e.textContent='No referral visits in this period.'; c.appendChild(e); return c; }
+  var sum=document.createElement('div'); sum.className='sig-sub'; sum.style.margin='0 0 8px';
+  sum.textContent=sigNum(ref)+' referred visitors'+(all?' ('+Math.round(ref/all*100)+'% of top sources)':'')+' · previous '+sigNum(prevRef);
+  c.appendChild(sum);
+  var t=document.createElement('table'); t.className='fin-table';
+  var th=document.createElement('thead'); var hr=document.createElement('tr');
+  ['Source','Visitors','Page views','vs previous'].forEach(function(x){ var e=document.createElement('th'); e.textContent=x; hr.appendChild(e); });
+  th.appendChild(hr); t.appendChild(th);
+  var tb=document.createElement('tbody');
+  cur.slice(0,15).forEach(function(r){
+    var tr=document.createElement('tr');
+    var a=document.createElement('td'); a.textContent=r.name; tr.appendChild(a);
+    var b=document.createElement('td'); b.textContent=sigNum(r.visitors); tr.appendChild(b);
+    var pv=document.createElement('td'); pv.textContent=sigNum(r.pageviews); tr.appendChild(pv);
+    var dd=document.createElement('td'); var p=prevMap[r.name];
+    if(p===undefined){ dd.textContent='New'; dd.className='sig-delta up'; }
+    else { var pct=p?(r.visitors-p)/p*100:0; dd.className='sig-delta '+(pct>0.5?'up':(pct<-0.5?'down':'flat')); dd.textContent=(pct>0.5?'↑ ':(pct<-0.5?'↓ ':'→ '))+Math.abs(pct).toFixed(0)+'%'; }
+    tr.appendChild(dd); tb.appendChild(tr);
+  });
+  t.appendChild(tb); c.appendChild(t);
+  return c;
+}
 function renderSignals(){
   sheet.innerHTML='';
   var w=document.createElement('div'); w.className='sig';
@@ -3572,8 +3602,9 @@ function renderSignals(){
 
   var g1=document.createElement('div'); g1.className='sig-grid2';
   g1.appendChild(sigList('Top pages', d.pages, 'visitors', 'No page data yet.'));
-  g1.appendChild(sigList('Traffic sources', d.referrers, 'visitors', 'No referrers yet.', function(n){ return n==='(none)'?'Direct / none':n; }));
+  g1.appendChild(sigList('Traffic sources', d.referrers.slice(0,10), 'visitors', 'No referrers yet.', function(n){ return n==='(none)'?'Direct / none':n; }));
   w.appendChild(g1);
+  w.appendChild(sigReferralCard(d));
   var g2=document.createElement('div'); g2.className='sig-grid2';
   g2.appendChild(sigList('Visitors by country', d.countries, 'visitors', 'No country data yet.'));
   g2.appendChild(sigList('Visitors by device', d.devices, 'visitors', 'No device data yet.'));
