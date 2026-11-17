@@ -544,6 +544,43 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .undo{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:80;background:var(--ink);color:#fff;padding:9px 14px;display:flex;gap:14px;align-items:center;font-family:var(--mono);font-size:13px;box-shadow:3px 3px 0 rgba(20,22,50,.3)}
 .undo button{background:#fff;color:var(--ink);border:0;padding:4px 10px;font-weight:700;cursor:pointer;font-family:inherit}
 /* ── GMC Finance ── */
+/* signals (Shopify-style analytics) */
+.sig{max-width:1100px;margin:14px auto 40px;padding:0 var(--pad)}
+.sig-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sig-head h2{font-size:20px;font-weight:800;margin:0}
+.sig-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sig-tools .act{font-size:12px;padding:6px 10px}
+.sig-tools .act[aria-pressed="true"]{background:var(--fg);color:var(--surface)}
+.sig-sub{font-family:var(--mono);font-size:11px;color:var(--fg-mut);margin:6px 0 0;letter-spacing:.03em}
+.sig-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.sig-tile{background:var(--surface);border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;box-shadow:3px 3px 0 rgba(20,22,50,.2);padding:12px 14px;border-left:6px solid var(--gmc);min-width:0}
+.sig-tl{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-mut)}
+.sig-tv{font-size:26px;font-weight:800;margin-top:4px;letter-spacing:-.01em}
+.sig-trow{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+.sig-spark{width:84px;height:30px;flex:none}
+.sig-delta{display:inline-block;font-size:12px;font-weight:700;margin-top:3px}
+.sig-delta.up{color:#1e7a3c}.sig-delta.down{color:#a32222}.sig-delta.flat{color:var(--fg-mut)}
+.sig-delta small{font-weight:400;color:var(--fg-mut);margin-left:4px}
+.sig-card{background:var(--surface);border:2px solid;border-color:#eef0fb #6a6d82 #6a6d82 #eef0fb;box-shadow:3px 3px 0 rgba(20,22,50,.2);padding:14px;margin-top:10px;min-width:0}
+.sig-ch{font-weight:800;font-size:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.sig-ch .sig-key{font-weight:400;font-size:11.5px;color:var(--fg-mut);display:flex;gap:12px}
+.sig-key i{display:inline-block;width:14px;height:0;border-top:2px solid var(--fg);vertical-align:middle;margin-right:5px}
+.sig-key i.prev{border-top:2px dashed var(--fg-mut)}
+.sig-chart{width:100%;height:auto;display:block}
+.sig-chart text{font-family:var(--mono);font-size:10px;fill:var(--fg-mut)}
+.sig-grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+.sig-grid2 .sig-card{margin-top:0}
+.sig-list{display:flex;flex-direction:column;gap:7px;font-size:13px}
+.sig-li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.sig-ln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative;z-index:1;padding:2px 6px}
+.sig-lw{position:relative}
+.sig-bar{position:absolute;left:0;top:0;bottom:0;background:rgba(233,206,92,.55)}
+.sig-lv{font-variant-numeric:tabular-nums;font-weight:700}
+.sig-empty{font-size:13px;color:var(--fg-mut)}
+@media (max-width:720px){
+  .sig-tiles{grid-template-columns:1fr}
+  .sig-grid2{grid-template-columns:1fr}
+}
 .fin{max-width:1100px;margin:14px auto 40px;padding:0 var(--pad)}
 .fin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .fin-head h2{font-size:20px;font-weight:800;margin:0}
@@ -3310,6 +3347,161 @@ var contactEditId=null;
 var contactFilter='', contactSort='name';
 
 /* ═══ GMC Finance (home) — sheet + Stripe clips via /api/gmc/finance ═══ */
+/* ═══ Signals: Shopify-style traffic analytics for gm-charlie.com ═══ */
+var SIG = { data:null, at:0, loading:false, error:null, range:30 };
+function sigLoad(force){
+  if(SIG.loading) return;
+  if(!force && SIG.data && SIG.data.range && SIG.data.range.days===SIG.range && Date.now()-SIG.at < 5*60*1000) return;
+  if(!fbUser){ SIG.error='Sign in to see signals.'; render(); return; }
+  SIG.loading=true; SIG.error=null; render();
+  fbUser.getIdToken().then(function(t){
+    return fetch('/api/gmc/signals?range='+SIG.range, { headers:{ Authorization:'Bearer '+t } });
+  }).then(function(r){ return r.json().then(function(d){ if(!r.ok||!d.ok) throw new Error(d.error||('HTTP '+r.status)); return d; }); })
+  .then(function(d){ SIG.data=d; SIG.at=Date.now(); SIG.loading=false; render(); })
+  .catch(function(e){ SIG.loading=false; SIG.error=e.message||String(e); render(); });
+}
+function sigNum(n){ return (Number(n)||0).toLocaleString('en-AU'); }
+function sigDelta(cur, prev){
+  var d=document.createElement('div'); d.className='sig-delta';
+  if(!prev){ d.className+=' flat'; d.textContent=cur?'New':'No change'; return d; }
+  var pct=(cur-prev)/prev*100;
+  d.className+=' '+(pct>0.5?'up':(pct<-0.5?'down':'flat'));
+  d.textContent=(pct>0.5?'↑ ':(pct<-0.5?'↓ ':'→ '))+Math.abs(pct).toFixed(pct>=100||pct<=-100?0:1)+'%';
+  var sm=document.createElement('small'); sm.textContent='vs previous'; d.appendChild(sm);
+  return d;
+}
+function sigSvg(w,h){ var NS='http://www.w3.org/2000/svg'; var s=document.createElementNS(NS,'svg'); s.setAttribute('viewBox','0 0 '+w+' '+h); return s; }
+function sigEl(svg,tag,attrs){ var e=document.createElementNS('http://www.w3.org/2000/svg',tag); Object.keys(attrs).forEach(function(k){ e.setAttribute(k,attrs[k]); }); svg.appendChild(e); return e; }
+function sigSpark(vals){
+  var s=sigSvg(84,30); s.setAttribute('class','sig-spark');
+  var max=Math.max.apply(null,vals.concat([1])), n=vals.length;
+  var pts=vals.map(function(v,i){ return (n>1?i*(84/(n-1)):0).toFixed(1)+','+(28-(v/max)*26).toFixed(1); }).join(' ');
+  sigEl(s,'polyline',{points:pts,fill:'none',stroke:'#14264a','stroke-width':'1.8','stroke-linejoin':'round'});
+  return s;
+}
+function sigChart(cur, prev, field){
+  var W=720,H=240,L=38,R=10,T=10,B=26, n=cur.length;
+  var max=1; cur.concat(prev).forEach(function(r){ if(r[field]>max) max=r[field]; });
+  var step=Math.pow(10,Math.floor(Math.log10(max))); var top=Math.ceil(max/step)*step; if(top/max>1.6) top=Math.ceil(max/(step/2))*(step/2); max=top;
+  var s=sigSvg(W,H); s.setAttribute('class','sig-chart');
+  function x(i){ return L+(n>1?i*((W-L-R)/(n-1)):0); }
+  function y(v){ return T+(H-T-B)*(1-v/max); }
+  for(var g=0;g<=4;g++){
+    var gv=max*g/4, gy=y(gv);
+    sigEl(s,'line',{x1:L,x2:W-R,y1:gy,y2:gy,stroke:'rgba(30,35,82,.14)','stroke-width':'1'});
+    var t=sigEl(s,'text',{x:L-6,y:gy+3,'text-anchor':'end'}); t.textContent=gv>=1000?(gv/1000).toFixed(gv%1000?1:0)+'k':Math.round(gv);
+  }
+  var every=Math.max(1,Math.round(n/6));
+  cur.forEach(function(r,i){
+    if(i%every!==0 && i!==n-1) return;
+    var d=new Date(r.date+'T00:00:00Z'); var t=sigEl(s,'text',{x:x(i),y:H-8,'text-anchor':i===0?'start':(i===n-1?'end':'middle')});
+    t.textContent=d.toLocaleDateString('en-AU',{day:'numeric',month:'short',timeZone:'UTC'});
+  });
+  function line(rows,stroke,dash,w){ sigEl(s,'polyline',{points:rows.map(function(r,i){ return x(i).toFixed(1)+','+y(r[field]).toFixed(1); }).join(' '),fill:'none',stroke:stroke,'stroke-width':w,'stroke-dasharray':dash||'none','stroke-linejoin':'round','stroke-linecap':'round'}); }
+  line(prev,'#8a8ea8','5 4','1.6');
+  var area=cur.map(function(r,i){ return x(i).toFixed(1)+','+y(r[field]).toFixed(1); }); 
+  sigEl(s,'polygon',{points:x(0).toFixed(1)+','+y(0)+' '+area.join(' ')+' '+x(n-1).toFixed(1)+','+y(0),fill:'rgba(233,206,92,.35)'});
+  line(cur,'#14264a','','2.2');
+  cur.forEach(function(r,i){
+    var c=sigEl(s,'circle',{cx:x(i),cy:y(r[field]),r:n>45?6:8,fill:'transparent'});
+    var tt=document.createElementNS('http://www.w3.org/2000/svg','title');
+    var p=prev[i]; tt.textContent=new Date(r.date+'T00:00:00Z').toLocaleDateString('en-AU',{day:'numeric',month:'short',timeZone:'UTC'})+': '+sigNum(r[field])+(p?' (previous '+sigNum(p[field])+')':'');
+    c.appendChild(tt);
+  });
+  return s;
+}
+function sigList(title, items, valKey, emptyMsg, fmt){
+  var c=document.createElement('div'); c.className='sig-card';
+  var h=document.createElement('div'); h.className='sig-ch'; h.textContent=title; c.appendChild(h);
+  if(!items.length){ var e=document.createElement('div'); e.className='sig-empty'; e.textContent=emptyMsg; c.appendChild(e); return c; }
+  var max=Math.max.apply(null,items.map(function(i){ return i[valKey]; }).concat([1]));
+  var ul=document.createElement('div'); ul.className='sig-list';
+  items.forEach(function(it){
+    var row=document.createElement('div'); row.className='sig-li';
+    var wrap=document.createElement('div'); wrap.className='sig-lw';
+    var bar=document.createElement('div'); bar.className='sig-bar'; bar.style.width=Math.max(2,it[valKey]/max*100)+'%'; wrap.appendChild(bar);
+    var nm=document.createElement('div'); nm.className='sig-ln'; nm.textContent=(fmt?fmt(it.name):it.name); nm.title=it.name; wrap.appendChild(nm);
+    var v=document.createElement('div'); v.className='sig-lv'; v.textContent=sigNum(it[valKey]);
+    row.appendChild(wrap); row.appendChild(v); ul.appendChild(row);
+  });
+  c.appendChild(ul); return c;
+}
+function renderSignals(){
+  sheet.innerHTML='';
+  var w=document.createElement('div'); w.className='sig';
+  var d=SIG.data;
+  var head=document.createElement('div'); head.className='sig-head';
+  var h2=document.createElement('h2'); h2.textContent='Signals · gm-charlie.com'; head.appendChild(h2);
+  var tools=document.createElement('div'); tools.className='sig-tools';
+  [7,30,90].forEach(function(n){
+    var b=document.createElement('button'); b.className='act'; b.textContent='Last '+n+' days'; b.setAttribute('aria-pressed', SIG.range===n?'true':'false');
+    b.onclick=function(){ if(SIG.range===n) return; SIG.range=n; sigLoad(true); };
+    tools.appendChild(b);
+  });
+  var rf=document.createElement('button'); rf.className='act'; rf.textContent=SIG.loading?'Loading…':'Refresh'; rf.disabled=SIG.loading; rf.onclick=function(){ sigLoad(true); };
+  tools.appendChild(rf); head.appendChild(tools); w.appendChild(head);
+
+  if(SIG.error){ var er=document.createElement('div'); er.className='fin-warn'; er.textContent=SIG.error; w.appendChild(er); }
+  if(d && d.configured===false){
+    var wn=document.createElement('div'); wn.className='fin-warn';
+    wn.appendChild(document.createTextNode('Signals is not connected yet. Add these in Vercel > Docket project > Settings > Environment Variables, then redeploy: '));
+    var cd=document.createElement('code'); cd.textContent=d.missing.join(', '); wn.appendChild(cd);
+    wn.appendChild(document.createElement('br'));
+    wn.appendChild(document.createTextNode('Also set GMC_VERCEL_TEAM_ID if gm-charlie.com sits in a Vercel team, and make sure Web Analytics is switched on for that project.'));
+    w.appendChild(wn); sheet.appendChild(w); return;
+  }
+  if(!d || (d.range && d.range.days!==SIG.range)){
+    if(!SIG.loading && !SIG.error){ var p=document.createElement('p'); p.className='sig-sub'; p.textContent='Loading signals…'; w.appendChild(p); }
+    sheet.appendChild(w); if(!SIG.loading && !SIG.error) sigLoad(false); return;
+  }
+
+  var up=document.createElement('div'); up.className='sig-sub';
+  up.textContent=d.range.since+' to '+d.range.until+' · compared with '+d.range.prevSince+' to '+d.range.prevUntil+' · updated '+new Date(SIG.at).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+  w.appendChild(up);
+
+  var cur=d.daily.current, prev=d.daily.previous, tc=d.totals.current, tp=d.totals.previous;
+  var ppvC=tc.visitors?tc.pageviews/tc.visitors:0, ppvP=tp.visitors?tp.pageviews/tp.visitors:0;
+  var tiles=document.createElement('div'); tiles.className='sig-tiles';
+  function tile(label,val,delta,spark){
+    var t=document.createElement('div'); t.className='sig-tile';
+    var l=document.createElement('div'); l.className='sig-tl'; l.textContent=label; t.appendChild(l);
+    var r=document.createElement('div'); r.className='sig-trow';
+    var v=document.createElement('div'); v.className='sig-tv'; v.textContent=val; r.appendChild(v);
+    if(spark) r.appendChild(spark);
+    t.appendChild(r); t.appendChild(delta); return t;
+  }
+  tiles.appendChild(tile('Visitors', sigNum(tc.visitors), sigDelta(tc.visitors,tp.visitors), sigSpark(cur.map(function(r){ return r.visitors; }))));
+  tiles.appendChild(tile('Page views', sigNum(tc.pageviews), sigDelta(tc.pageviews,tp.pageviews), sigSpark(cur.map(function(r){ return r.pageviews; }))));
+  tiles.appendChild(tile('Pages per visitor', ppvC.toFixed(2), sigDelta(ppvC,ppvP), null));
+  w.appendChild(tiles);
+  if(tc.approx){ var ap=document.createElement('div'); ap.className='sig-sub'; ap.textContent='Visitor total is a sum of daily visitors, so repeat visitors across days count more than once.'; w.appendChild(ap); }
+
+  var cc=document.createElement('div'); cc.className='sig-card';
+  var ch=document.createElement('div'); ch.className='sig-ch';
+  var ct=document.createElement('span'); ct.textContent='Visitors over time'; ch.appendChild(ct);
+  var key=document.createElement('span'); key.className='sig-key';
+  key.innerHTML='<span><i></i>This period</span><span><i class="prev"></i>Previous period</span>'; ch.appendChild(key);
+  cc.appendChild(ch); cc.appendChild(sigChart(cur,prev,'visitors')); w.appendChild(cc);
+
+  var cp=document.createElement('div'); cp.className='sig-card';
+  var ph=document.createElement('div'); ph.className='sig-ch'; ph.textContent='Page views over time'; cp.appendChild(ph);
+  cp.appendChild(sigChart(cur,prev,'pageviews')); w.appendChild(cp);
+
+  var g1=document.createElement('div'); g1.className='sig-grid2';
+  g1.appendChild(sigList('Top pages', d.pages, 'visitors', 'No page data yet.'));
+  g1.appendChild(sigList('Traffic sources', d.referrers, 'visitors', 'No referrers yet.', function(n){ return n==='(none)'?'Direct / none':n; }));
+  w.appendChild(g1);
+  var g2=document.createElement('div'); g2.className='sig-grid2';
+  g2.appendChild(sigList('Visitors by country', d.countries, 'visitors', 'No country data yet.'));
+  g2.appendChild(sigList('Visitors by device', d.devices, 'visitors', 'No device data yet.'));
+  w.appendChild(g2);
+  if(d.events && d.events.length){
+    var g3=document.createElement('div'); g3.className='sig-grid2';
+    g3.appendChild(sigList('Custom events', d.events.map(function(e){ return {name:e.name, count:e.count}; }), 'count', 'No events yet.'));
+    w.appendChild(g3);
+  }
+  sheet.appendChild(w);
+}
 var FIN = { data:null, at:0, loading:false, error:null, fy:null };
 var FIN_COL = { service:'#e9ce5c', blanks:'#ffffff', clips:'#3b45c7', expenses:'#a32222' };
 var FIN_LAB = { service:'Income', blanks:'Blanks', clips:'Stripe clips', expenses:'Expenses' };
@@ -3914,7 +4106,7 @@ function render(){
 
   // per-business tabs
   var TABS = {
-    gmc: [hubTabs()[0],['finance','Finance']].concat(hubTabs().slice(1)),
+    gmc: [hubTabs()[0],['finance','Finance'],['signals','Signals']].concat(hubTabs().slice(1)),
     cb: hubTabs(),
     me:[['tasks','To-do'],['jot','Jot'],['calendar','Calendar']],
     pit:[['tasks','Tasks'],['grid','Grid'],['store','Store'+(ST_UNFUL?' <span style="background:#a32222;color:#fff;border-radius:9px;padding:0 6px;font-size:11px;">'+ST_UNFUL+'</span>':'')]]
@@ -3963,6 +4155,7 @@ function render(){
   if(S.page==='jot'){ document.getElementById('headcount').textContent=''; renderJot(); return; }
   if(S.page==='audit'){ document.getElementById('headcount').textContent=''; renderAudit(); return; }
   if(S.page==='finance'){ document.getElementById('headcount').textContent=''; renderFinance(); return; }
+  if(S.page==='signals'){ document.getElementById('headcount').textContent=''; renderSignals(); return; }
 
   var dockEl=document.getElementById('dock'); if(dockEl) dockEl.style.display='none';  // business is the scope
   var c=counts();
