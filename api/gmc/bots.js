@@ -105,6 +105,7 @@ export default async function handler(req, res) {
     return;
   }
   if (cache && cache.exp > Date.now()) {
+    if (req.query && req.query.debug) { res.status(200).json({ ok: true, cachedRaw: JSON.stringify(cache.raw).slice(0, 4000) }); return; }
     res.status(200).json(Object.assign({}, cache.body, { cached: true }));
     return;
   }
@@ -124,7 +125,9 @@ export default async function handler(req, res) {
       updatedAt: new Date().toISOString(),
       cached: false
     };
-    cache = { body: body, exp: Date.now() + TTL };
+    const raw = { geo: geoRaw, sources: srcRaw };
+    cache = { body: body, raw: raw, exp: Date.now() + TTL };
+    if (req.query && req.query.debug) { res.status(200).json(Object.assign({}, body, { raw: JSON.stringify(raw).slice(0, 4000) })); return; }
     res.status(200).json(body);
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message || String(e) });
