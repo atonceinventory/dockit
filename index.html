@@ -3553,7 +3553,7 @@ function sigBotCards(w){
   function tile(l,v,sub){ var x=document.createElement('div'); x.className='sig-tile'; var a=document.createElement('div'); a.className='sig-tl'; a.textContent=l; var b=document.createElement('div'); b.className='sig-tv'; b.textContent=v; x.appendChild(a); x.appendChild(b); if(sub){ var c=document.createElement('div'); c.className='sig-delta flat'; c.textContent=sub; x.appendChild(c); } return x; }
   tiles.appendChild(tile('Bot sessions', sigNum(t.bots), 'last '+d.windowDays+' days'));
   tiles.appendChild(tile('Bot share', t.botPct.toFixed(1)+'%', sigNum(t.sessions)+' total sessions'));
-  tiles.appendChild(tile('Human sessions', sigNum(t.humans), 'bots excluded'));
+  tiles.appendChild(tile('Human sessions', sigNum(t.humans), 'recorded by Clarity'));
   bc.appendChild(tiles);
   var sh=document.createElement('div'); sh.className='sig-ch'; sh.style.marginTop='14px'; sh.textContent='Bot sessions by source'; bc.appendChild(sh);
   var srows=d.sources.filter(function(r){ return r.bots>0; });
@@ -3561,8 +3561,8 @@ function sigBotCards(w){
   else bc.appendChild(botTable(['Source','Bot sessions','All sessions','Bot %'], srows.map(function(r){ return [r.name, sigNum(r.bots), sigNum(r.sessions), (r.sessions?r.bots/r.sessions*100:0).toFixed(0)+'%']; })));
   var gc=card('Geo sessions');
   if(!d.geo.length){ var e2=document.createElement('div'); e2.className='sig-empty'; e2.textContent='No session data yet.'; gc.appendChild(e2); }
-  else gc.appendChild(botTable(['Country','Sessions','Human','Bot','Bot %'], d.geo.map(function(r){ return [r.name, sigNum(r.sessions), sigNum(r.humans), sigNum(r.bots), (r.sessions?r.bots/r.sessions*100:0).toFixed(0)+'%']; })));
-  var up=document.createElement('div'); up.className='sig-sub'; up.textContent='Source: Microsoft Clarity, last '+d.windowDays+' days (its maximum), refreshed about every 4 hours. Updated '+new Date(d.updatedAt).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+'.'; gc.appendChild(up);
+  else { var gt=d.geo.reduce(function(x,r){ return x+r.humans; },0); gc.appendChild(botTable(['Country','Sessions','Share'], d.geo.map(function(r){ return [r.name, sigNum(r.humans), (gt?r.humans/gt*100:0).toFixed(0)+'%']; }))); }
+  var up=document.createElement('div'); up.className='sig-sub'; up.textContent='Source: Microsoft Clarity, last '+d.windowDays+' days (its maximum), refreshed about every 4 hours. Geo counts human sessions only; Clarity does not split bots by country. Updated '+new Date(d.updatedAt).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+'.'; gc.appendChild(up);
 }
 function sigReferralCard(d){
   var c=document.createElement('div'); c.className='sig-card';

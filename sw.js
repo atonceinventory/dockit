@@ -1,6 +1,6 @@
 /* Docket service worker.
    Bump CACHE when you change index.html so phones pick up the new version. */
-const CACHE = 'docket-v115';
+const CACHE = 'docket-v116';
 
 const SHELL = [
   './',
