@@ -6,7 +6,7 @@
 //   CLARITY_API_TOKEN   API token from Clarity > Settings > Data Export (project admin). Use the token for the gm-charlie.com project.
 //
 // Clarity limits: 10 requests per project per day, data only for the last 1-3 days, 1,000 rows, no pagination.
-// So each refresh costs 2 requests (by country, by source) and the result is cached in memory for 4 hours.
+// So each refresh costs 1 request (by source; the response also carries the Country metric) and the result is cached in memory for 4 hours.
 
 import crypto from 'node:crypto';
 
@@ -77,12 +77,12 @@ function trafficRows(payload) {
   const info = (traffic && Array.isArray(traffic.information)) ? traffic.information : [];
   return info.map(function (r) {
     const dimKey = Object.keys(r).find(function (k) { return !METRIC_KEYS[k.toLowerCase()]; });
-    const sessions = num(r.totalSessionCount), bots = num(r.totalBotSessionCount);
+    const humans = num(r.totalSessionCount), bots = num(r.totalBotSessionCount);
     return {
       name: dimKey ? String(r[dimKey] === null || r[dimKey] === '' ? '(none)' : r[dimKey]) : '(all)',
-      sessions: sessions,
+      sessions: humans + bots,
       bots: bots,
-      humans: Math.max(0, sessions - bots),
+      humans: humans,
       users: num(r.distinctUserCount !== undefined ? r.distinctUserCount : r.distantUserCount)
     };
   });
@@ -90,7 +90,21 @@ function trafficRows(payload) {
 
 function trafficOnly(raw) {
   const pick = function (p) { return (Array.isArray(p) ? p : []).filter(function (m) { return m && /traffic/i.test(String(m.metricName)); }); };
-  return { geo: pick(raw.geo), sources: pick(raw.sources), geoMetrics: (Array.isArray(raw.geo) ? raw.geo : []).map(function (m) { return m && m.metricName; }) };
+  const country = (Array.isArray(raw.sources) ? raw.sources : []).filter(function (m) { return m && String(m.metricName).toLowerCase() === 'country'; });
+  return { sources: pick(raw.sources), country: country };
+}
+
+// Country metric: rows like { <country name>, sessionsCount, ... }. Field names are read defensively.
+function countryRows(payload) {
+  const list = Array.isArray(payload) ? payload : [];
+  const m = list.find(function (x) { return x && String(x.metricName).toLowerCase() === 'country'; });
+  const info = (m && Array.isArray(m.information)) ? m.information : [];
+  return info.map(function (r) {
+    const nameKey = Object.keys(r).find(function (k) { return typeof r[k] === 'string' && isNaN(Number(r[k])); });
+    const humans = num(r.sessionsCount !== undefined ? r.sessionsCount : r.totalSessionCount);
+    const bots = num(r.totalBotSessionCount !== undefined ? r.totalBotSessionCount : r.botSessionsCount);
+    return { name: nameKey ? String(r[nameKey]) : '(unknown)', sessions: humans + bots, bots: bots, humans: humans, users: num(r.distinctUserCount) };
+  });
 }
 
 let cache = null;
@@ -115,22 +129,24 @@ export default async function handler(req, res) {
     return;
   }
   try {
-    const [geoRaw, srcRaw] = await Promise.all([clarity('Country/Region'), clarity('Source')]);
-    const geo = trafficRows(geoRaw).sort(function (a, b) { return b.sessions - a.sessions; });
+    // One request: the response carries every metric (Traffic split by Source, plus a Country metric).
+    const srcRaw = await clarity('Source');
     const sources = trafficRows(srcRaw).sort(function (a, b) { return b.bots - a.bots; });
+    const geo = countryRows(srcRaw).sort(function (a, b) { return b.sessions - a.sessions; });
     const sum = function (arr, k) { return arr.reduce(function (a, r) { return a + r[k]; }, 0); };
-    const sessions = sum(geo, 'sessions'), bots = sum(geo, 'bots');
+    // Clarity keeps bot sessions out of its session counts, so a source's total traffic is sessions + bots.
+    const humans = sum(sources, 'sessions'), bots = sum(sources, 'bots'), sessions = humans + bots;
     const body = {
       ok: true,
       configured: true,
       windowDays: DAYS,
-      totals: { sessions: sessions, bots: bots, humans: Math.max(0, sessions - bots), botPct: sessions ? bots / sessions * 100 : 0 },
+      totals: { sessions: sessions, bots: bots, humans: humans, botPct: sessions ? bots / sessions * 100 : 0 },
       geo: geo.slice(0, 15),
       sources: sources.slice(0, 15),
       updatedAt: new Date().toISOString(),
       cached: false
     };
-    const raw = { geo: geoRaw, sources: srcRaw };
+    const raw = { sources: srcRaw };
     cache = { body: body, raw: raw, exp: Date.now() + TTL };
     if (req.query && req.query.debug) { res.status(200).json(Object.assign({}, body, { raw: JSON.stringify(trafficOnly(raw)) })); return; }
     res.status(200).json(body);
