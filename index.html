@@ -566,6 +566,40 @@ main{padding:0 var(--pad) calc(var(--nav) + 24px)}
 .binp-d{font-family:var(--mono);font-size:10px;color:var(--fg-mut);display:block;margin-top:2px}
 .binp-li .act{font-size:11px;padding:4px 8px}
 .binp-e{font-size:13px;color:var(--fg-mut);padding:8px 0}
+/* shopify-analytics look for Signals */
+.sig2{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;max-width:1240px}
+.sig2 .sig-head h2{display:flex;align-items:baseline;gap:10px;font-size:15px;font-weight:650;flex-wrap:wrap}
+.sig2 .sig-ic{display:inline-flex;align-self:center;color:#303030}
+.sig2 .sig-refreshed{font-size:13px;font-weight:400;color:#616161}
+.sig2 .sig-tools .act{border-radius:10px;border:1px solid #d6d6d6;background:#fff;color:#303030;box-shadow:none;font-weight:550}
+.sig2 .sig-tools .act[aria-pressed="true"]{background:#303030;color:#fff;border-color:#303030}
+.sig2 .sg3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
+.sig2 .span3{grid-column:1/-1}
+.sig2 .sig-card{background:#fff;border:1px solid #e3e3e3;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);margin:0;padding:18px 20px;min-height:0}
+.sig2 .sig-ch{font-size:13px;font-weight:650;margin-bottom:10px}
+.sig2 .sig-ttl{border-bottom:1px dotted #8a8a8a;padding-bottom:1px}
+.sig2 .sig-big{font-size:26px;font-weight:700;letter-spacing:-.01em}
+.sig2 .sig-legend{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;font-size:12px;color:#616161;margin-top:6px}
+.sig2 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.sig2 .dot.cur{background:#4aa3e3}.sig2 .dot.prev{background:#a9d1f2}
+.sig2 .sc-cur{stroke:#4aa3e3}.sig2 .sc-prev{stroke:#a9d1f2;stroke-dasharray:none}
+.sig2 .sc-area{fill:none}
+.sig2 .sc-grid{stroke:#ececec}
+.sig2 .sig-chart text{font-family:inherit;fill:#616161}
+.sig2 .sig-brk{display:flex;flex-direction:column}
+.sig2 .sig-brow{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:8px 8px;border-radius:8px;font-size:13.5px}
+.sig2 .sig-brow:nth-child(even){background:#f6f6f6}
+.sig2 .sig-bl{color:#005bd3}
+.sig2 .sig-brow .sig-delta{margin:0;min-width:70px;text-align:right}
+.sig2 .sig-brow .sig-delta small{display:none}
+.sig2 .sig-bar{background:#cfe5f8}
+.sig2 .sig-empty{display:flex;align-items:center;justify-content:center;min-height:150px;color:#616161;font-size:13.5px}
+.sig2 .sig-tiles{grid-template-columns:1fr;margin-top:0}
+.sig2 .sig-tile{border:1px solid #ececec;border-left:1px solid #ececec;border-radius:12px;box-shadow:none;background:#fafafa}
+.sig2 .fin-warn{grid-column:1/-1}
+.sig2 .fin-table{width:100%;font-size:13px}
+.sig2 .sig-card{overflow-x:auto}
+@media (max-width:900px){.sig2 .sg3{grid-template-columns:1fr}.sig2 .span3{grid-column:auto}}
 /* signals (Shopify-style analytics) */
 .sig{max-width:1100px;margin:14px auto 40px;padding:0 var(--pad)}
 .sig-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -3471,7 +3505,7 @@ function sigChart(cur, prev, field){
   function y(v){ return T+(H-T-B)*(1-v/max); }
   for(var g=0;g<=4;g++){
     var gv=max*g/4, gy=y(gv);
-    sigEl(s,'line',{x1:L,x2:W-R,y1:gy,y2:gy,stroke:'rgba(30,35,82,.14)','stroke-width':'1'});
+    sigEl(s,'line',{x1:L,x2:W-R,y1:gy,y2:gy,stroke:'rgba(30,35,82,.14)','stroke-width':'1','class':'sc-grid'});
     var t=sigEl(s,'text',{x:L-6,y:gy+3,'text-anchor':'end'}); t.textContent=gv>=1000?(gv/1000).toFixed(gv%1000?1:0)+'k':Math.round(gv);
   }
   var every=Math.max(1,Math.round(n/6));
@@ -3480,11 +3514,11 @@ function sigChart(cur, prev, field){
     var d=new Date(r.date+'T00:00:00Z'); var t=sigEl(s,'text',{x:x(i),y:H-8,'text-anchor':i===0?'start':(i===n-1?'end':'middle')});
     t.textContent=d.toLocaleDateString('en-AU',{day:'numeric',month:'short',timeZone:'UTC'});
   });
-  function line(rows,stroke,dash,w){ sigEl(s,'polyline',{points:rows.map(function(r,i){ return x(i).toFixed(1)+','+y(r[field]).toFixed(1); }).join(' '),fill:'none',stroke:stroke,'stroke-width':w,'stroke-dasharray':dash||'none','stroke-linejoin':'round','stroke-linecap':'round'}); }
-  line(prev,'#8a8ea8','5 4','1.6');
+  function line(rows,stroke,dash,w,cls){ sigEl(s,'polyline',{'class':cls,points:rows.map(function(r,i){ return x(i).toFixed(1)+','+y(r[field]).toFixed(1); }).join(' '),fill:'none',stroke:stroke,'stroke-width':w,'stroke-dasharray':dash||'none','stroke-linejoin':'round','stroke-linecap':'round'}); }
+  line(prev,'#8a8ea8','5 4','1.6','sc-prev');
   var area=cur.map(function(r,i){ return x(i).toFixed(1)+','+y(r[field]).toFixed(1); }); 
-  sigEl(s,'polygon',{points:x(0).toFixed(1)+','+y(0)+' '+area.join(' ')+' '+x(n-1).toFixed(1)+','+y(0),fill:'rgba(233,206,92,.35)'});
-  line(cur,'#14264a','','2.2');
+  sigEl(s,'polygon',{points:x(0).toFixed(1)+','+y(0)+' '+area.join(' ')+' '+x(n-1).toFixed(1)+','+y(0),fill:'rgba(233,206,92,.35)','class':'sc-area'});
+  line(cur,'#14264a','','2.2','sc-cur');
   cur.forEach(function(r,i){
     var c=sigEl(s,'circle',{cx:x(i),cy:y(r[field]),r:n>45?6:8,fill:'transparent'});
     var tt=document.createElementNS('http://www.w3.org/2000/svg','title');
@@ -3495,7 +3529,7 @@ function sigChart(cur, prev, field){
 }
 function sigList(title, items, valKey, emptyMsg, fmt){
   var c=document.createElement('div'); c.className='sig-card';
-  var h=document.createElement('div'); h.className='sig-ch'; h.textContent=title; c.appendChild(h);
+  var h=document.createElement('div'); h.className='sig-ch'; var hs=document.createElement('span'); hs.className='sig-ttl'; hs.textContent=title; h.appendChild(hs); c.appendChild(h);
   if(!items.length){ var e=document.createElement('div'); e.className='sig-empty'; e.textContent=emptyMsg; c.appendChild(e); return c; }
   var max=Math.max.apply(null,items.map(function(i){ return i[valKey]; }).concat([1]));
   var ul=document.createElement('div'); ul.className='sig-list';
@@ -3596,10 +3630,13 @@ function sigReferralCard(d){
 }
 function renderSignals(){
   sheet.innerHTML='';
-  var w=document.createElement('div'); w.className='sig';
+  var w=document.createElement('div'); w.className='sig sig2';
   var d=SIG.data;
   var head=document.createElement('div'); head.className='sig-head';
-  var h2=document.createElement('h2'); h2.textContent='Signals · gm-charlie.com'; head.appendChild(h2);
+  var h2=document.createElement('h2');
+  var ic=document.createElement('span'); ic.className='sig-ic'; ic.innerHTML='<svg viewBox="0 0 20 20" width="18" height="18"><path d="M3 17V9h3v8H3zm5.5 0V3h3v14h-3zM14 17v-5h3v5h-3z" fill="currentColor"/></svg>'; h2.appendChild(ic);
+  h2.appendChild(document.createTextNode('Analytics'));
+  var rfsh=document.createElement('span'); rfsh.className='sig-refreshed'; rfsh.textContent=SIG.at?('Refreshed today at '+new Date(SIG.at).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}).toUpperCase()+' · gm-charlie.com'):'gm-charlie.com'; h2.appendChild(rfsh); head.appendChild(h2);
   var tools=document.createElement('div'); tools.className='sig-tools';
   [7,30,90].forEach(function(n){
     var b=document.createElement('button'); b.className='act'; b.textContent='Last '+n+' days'; b.setAttribute('aria-pressed', SIG.range===n?'true':'false');
@@ -3623,54 +3660,60 @@ function renderSignals(){
     sheet.appendChild(w); if(!SIG.loading && !SIG.error) sigLoad(false); return;
   }
 
-  var up=document.createElement('div'); up.className='sig-sub';
-  up.textContent=d.range.since+' to '+d.range.until+' · compared with '+d.range.prevSince+' to '+d.range.prevUntil+' · updated '+new Date(SIG.at).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
-  w.appendChild(up);
-
   var cur=d.daily.current, prev=d.daily.previous, tc=d.totals.current, tp=d.totals.previous;
   var ppvC=tc.visitors?tc.pageviews/tc.visitors:0, ppvP=tp.visitors?tp.pageviews/tp.visitors:0;
-  var tiles=document.createElement('div'); tiles.className='sig-tiles';
-  function tile(label,val,delta,spark){
-    var t=document.createElement('div'); t.className='sig-tile';
-    var l=document.createElement('div'); l.className='sig-tl'; l.textContent=label; t.appendChild(l);
-    var r=document.createElement('div'); r.className='sig-trow';
-    var v=document.createElement('div'); v.className='sig-tv'; v.textContent=val; r.appendChild(v);
-    if(spark) r.appendChild(spark);
-    t.appendChild(r); t.appendChild(delta); return t;
-  }
-  tiles.appendChild(tile('Visitors', sigNum(tc.visitors), sigDelta(tc.visitors,tp.visitors), sigSpark(cur.map(function(r){ return r.visitors; }))));
-  tiles.appendChild(tile('Page views', sigNum(tc.pageviews), sigDelta(tc.pageviews,tp.pageviews), sigSpark(cur.map(function(r){ return r.pageviews; }))));
-  tiles.appendChild(tile('Pages per visitor', ppvC.toFixed(2), sigDelta(ppvC,ppvP), null));
-  w.appendChild(tiles);
-  if(tc.approx){ var ap=document.createElement('div'); ap.className='sig-sub'; ap.textContent='Visitor total is a sum of daily visitors, so repeat visitors across days count more than once.'; w.appendChild(ap); }
+  function fmtD(iso){ return new Date(iso+'T00:00:00Z').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}); }
+  function legend(){ var k=document.createElement('div'); k.className='sig-legend'; var a=document.createElement('span'); a.innerHTML='<i class="dot cur"></i>'; a.appendChild(document.createTextNode(fmtD(d.range.since)+' – '+fmtD(d.range.until))); var b=document.createElement('span'); b.innerHTML='<i class="dot prev"></i>'; b.appendChild(document.createTextNode(fmtD(d.range.prevSince)+' – '+fmtD(d.range.prevUntil))); k.appendChild(a); k.appendChild(b); return k; }
+  function cell(title, cls){ var c=document.createElement('div'); c.className='sig-card'+(cls?' '+cls:''); if(title){ var h=document.createElement('div'); h.className='sig-ch'; var sp=document.createElement('span'); sp.className='sig-ttl'; sp.textContent=title; h.appendChild(sp); c.appendChild(h); } return c; }
+  function big(val, a, b){ var x=document.createElement('div'); x.className='sig-big'; x.textContent=val; var wrap=document.createElement('div'); wrap.appendChild(x); wrap.appendChild(sigDelta(a,b)); return wrap; }
+  var grid=document.createElement('div'); grid.className='sg3'; w.appendChild(grid);
 
-  var cc=document.createElement('div'); cc.className='sig-card';
-  var ch=document.createElement('div'); ch.className='sig-ch';
-  var ct=document.createElement('span'); ct.textContent='Visitors over time'; ch.appendChild(ct);
-  var key=document.createElement('span'); key.className='sig-key';
-  key.innerHTML='<span><i></i>This period</span><span><i class="prev"></i>Previous period</span>'; ch.appendChild(key);
-  cc.appendChild(ch); cc.appendChild(sigChart(cur,prev,'visitors')); w.appendChild(cc);
+  // row 1: visitors over time (full width)
+  var c1=cell('Visitors over time','span3'); c1.appendChild(big(sigNum(tc.visitors), tc.visitors, tp.visitors)); c1.appendChild(sigChart(cur,prev,'visitors')); c1.appendChild(legend()); grid.appendChild(c1);
+  if(tc.approx){ var ap=document.createElement('div'); ap.className='sig-sub span3'; ap.textContent='Visitor total is a sum of daily visitors, so repeat visitors across days count more than once.'; grid.appendChild(ap); }
 
-  var cp=document.createElement('div'); cp.className='sig-card';
-  var ph=document.createElement('div'); ph.className='sig-ch'; ph.textContent='Page views over time'; cp.appendChild(ph);
-  cp.appendChild(sigChart(cur,prev,'pageviews')); w.appendChild(cp);
+  // row 2: page views over time | breakdown | top pages
+  var c2=cell('Page views over time'); c2.appendChild(big(sigNum(tc.pageviews), tc.pageviews, tp.pageviews)); c2.appendChild(sigChart(cur,prev,'pageviews')); c2.appendChild(legend()); grid.appendChild(c2);
+  var direct=0, directPrev=0, refd=0, refdPrev=0;
+  d.referrers.forEach(function(r){ if(r.name==='(none)') direct+=r.visitors; else refd+=r.visitors; });
+  (d.referrersPrev||[]).forEach(function(r){ if(r.name==='(none)') directPrev+=r.visitors; else refdPrev+=r.visitors; });
+  var c3=cell('Traffic breakdown'); var bl=document.createElement('div'); bl.className='sig-brk';
+  function brow(label, valTxt, a, b){ var r=document.createElement('div'); r.className='sig-brow'; var l=document.createElement('span'); l.className='sig-bl'; l.textContent=label; var v=document.createElement('b'); v.textContent=valTxt; var dl=sigDelta(a,b); r.appendChild(l); r.appendChild(v); r.appendChild(dl); bl.appendChild(r); }
+  brow('Visitors', sigNum(tc.visitors), tc.visitors, tp.visitors);
+  brow('Page views', sigNum(tc.pageviews), tc.pageviews, tp.pageviews);
+  brow('Pages per visitor', ppvC.toFixed(2), ppvC, ppvP);
+  brow('Referred visitors', sigNum(refd), refd, refdPrev);
+  brow('Direct visitors', sigNum(direct), direct, directPrev);
+  c3.appendChild(bl); grid.appendChild(c3);
+  grid.appendChild(sigList('Top pages', d.pages, 'visitors', 'No data for this date range'));
 
-  var g1=document.createElement('div'); g1.className='sig-grid2';
-  g1.appendChild(sigList('Top pages', d.pages, 'visitors', 'No page data yet.'));
-  g1.appendChild(sigList('Traffic sources', d.referrers.slice(0,10), 'visitors', 'No referrers yet.', function(n){ return n==='(none)'?'Direct / none':n; }));
-  w.appendChild(g1);
-  w.appendChild(sigReferralCard(d));
-  sigBotCards(w);
-  var g2=document.createElement('div'); g2.className='sig-grid2';
-  g2.appendChild(sigList('Visitors by country', d.countries, 'visitors', 'No country data yet.'));
-  g2.appendChild(sigList('Visitors by device', d.devices, 'visitors', 'No device data yet.'));
-  w.appendChild(g2);
+  // row 3: location | referrer | device
+  grid.appendChild(sigList('Visitors by location', d.countries, 'visitors', 'No data for this date range'));
+  grid.appendChild(sigList('Visitors by referrer', d.referrers.slice(0,10), 'visitors', 'No data for this date range', function(n){ return n==='(none)'?'Direct / none':n; }));
+  grid.appendChild(sigList('Visitors by device', d.devices, 'visitors', 'No data for this date range'));
+
+  // row 4: marketing channel | bot traffic | geo sessions (Clarity)
+  var chan={}, chanPrev={};
+  function addCh(map, list){ (list||[]).forEach(function(r){ var k=sigChannel(r.name); map[k]=(map[k]||0)+r.visitors; }); }
+  addCh(chan, d.referrers); addCh(chanPrev, d.referrersPrev);
+  var chItems=Object.keys(chan).map(function(k){ return {name:k, visitors:chan[k]}; }).sort(function(a,b){ return b.visitors-a.visitors; });
+  var mc=sigList('Performance by marketing channel', chItems, 'visitors', 'No data for this date range'); grid.appendChild(mc);
+  sigBotCards(grid);
+
+  // wide: referral table, events
+  var rc=sigReferralCard(d); rc.className+=' span3'; grid.appendChild(rc);
   if(d.events && d.events.length){
-    var g3=document.createElement('div'); g3.className='sig-grid2';
-    g3.appendChild(sigList('Custom events', d.events.map(function(e){ return {name:e.name, count:e.count}; }), 'count', 'No events yet.'));
-    w.appendChild(g3);
+    grid.appendChild(sigList('Custom events', d.events.map(function(e){ return {name:e.name, count:e.count}; }), 'count', 'No events yet.'));
   }
   sheet.appendChild(w);
+}
+function sigChannel(host){
+  var h=String(host||'').toLowerCase();
+  if(h==='(none)'||h==='') return 'Direct';
+  if(/(^|\.)(google|bing|duckduckgo|yahoo|ecosia|baidu|yandex|brave|startpage)\./.test(h)||/^(search\.|www\.google)/.test(h)) return 'Organic search';
+  if(/(instagram|facebook|fb\.com|l\.facebook|twitter|^t\.co$|x\.com|linkedin|lnkd\.in|pinterest|tiktok|youtube|youtu\.be|reddit|threads\.net)/.test(h)) return 'Social';
+  if(/(mail\.|outlook|gmail|klaviyo|mailchimp|substack)/.test(h)) return 'Email';
+  return 'Other referral';
 }
 var FIN = { data:null, at:0, loading:false, error:null, fy:null };
 var FIN_COL = { service:'#e9ce5c', blanks:'#ffffff', clips:'#3b45c7', expenses:'#a32222' };
