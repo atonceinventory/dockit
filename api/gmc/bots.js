@@ -58,7 +58,8 @@ async function verifyMember(req) {
 function num(x) { const n = Number(x); return isFinite(n) ? n : 0; }
 
 async function clarity(dimension) {
-  const qs = new URLSearchParams({ numOfDays: String(DAYS), dimension1: dimension });
+  const qs = new URLSearchParams({ numOfDays: String(DAYS) });
+  if (dimension) qs.set('dimension1', dimension);
   const res = await fetch(ENDPOINT + '?' + qs.toString(), {
     headers: { Authorization: 'Bearer ' + process.env.CLARITY_API_TOKEN, 'Content-Type': 'application/json' }
   });
@@ -90,7 +91,7 @@ function trafficRows(payload) {
 
 function trafficOnly(raw) {
   const pick = function (p) { return (Array.isArray(p) ? p : []).filter(function (m) { return m && /traffic/i.test(String(m.metricName)); }); };
-  const country = (Array.isArray(raw.sources) ? raw.sources : []).filter(function (m) { return m && String(m.metricName).toLowerCase() === 'country'; });
+  const country = (Array.isArray(raw.all) ? raw.all : []).filter(function (m) { return m && String(m.metricName).toLowerCase() === 'country'; });
   return { sources: pick(raw.sources), country: country };
 }
 
@@ -129,13 +130,14 @@ export default async function handler(req, res) {
     return;
   }
   try {
-    // One request: the response carries every metric (Traffic split by Source, plus a Country metric).
-    const srcRaw = await clarity('Source');
+    // Two requests. A request with no usable dimension returns every dashboard metric (incl. Country);
+    // a Source request returns Traffic split by source.
+    const [allRaw, srcRaw] = await Promise.all([clarity(null), clarity('Source')]);
     const sources = trafficRows(srcRaw).sort(function (a, b) { return b.bots - a.bots; });
-    const geo = countryRows(srcRaw).sort(function (a, b) { return b.sessions - a.sessions; });
+    const geo = countryRows(allRaw).sort(function (a, b) { return b.sessions - a.sessions; });
     const sum = function (arr, k) { return arr.reduce(function (a, r) { return a + r[k]; }, 0); };
     // Clarity keeps bot sessions out of its session counts, so a source's total traffic is sessions + bots.
-    const humans = sum(sources, 'sessions'), bots = sum(sources, 'bots'), sessions = humans + bots;
+    const humans = sum(sources, 'humans'), bots = sum(sources, 'bots'), sessions = humans + bots;
     const body = {
       ok: true,
       configured: true,
@@ -146,7 +148,7 @@ export default async function handler(req, res) {
       updatedAt: new Date().toISOString(),
       cached: false
     };
-    const raw = { sources: srcRaw };
+    const raw = { sources: srcRaw, all: allRaw };
     cache = { body: body, raw: raw, exp: Date.now() + TTL };
     if (req.query && req.query.debug) { res.status(200).json(Object.assign({}, body, { raw: JSON.stringify(trafficOnly(raw)) })); return; }
     res.status(200).json(body);
