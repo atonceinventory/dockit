@@ -2618,7 +2618,6 @@ function renderProjects(){
     var tk=(pp.tasks||[]).filter(function(x){return x.id===S.timer.taskId;})[0];
     var tot=document.querySelector('.pj-time.live[data-pid="'+pp.id+'"]'); if(tot) tot.textContent='\u23f1 '+fmtDur(projectTotalSec(pp));
     var tl=document.querySelector('.pj2-ttime.live[data-tid="'+S.timer.taskId+'"]'); if(tl && tk) tl.textContent=fmtDur(taskTotalSec(tk));
-    var brk=document.querySelector('.pj-breakdown[data-pid="'+pp.id+'"]'); if(brk) brk.textContent='Time logged: '+breakdownStr(pp);
   },1000); }
 }
 
@@ -2678,14 +2677,6 @@ function projectBlock(p){
 
   hd.appendChild(db); hd.appendChild(del);
   block.appendChild(hd);
-
-  // per-person breakdown (rolled up from tasks)
-  var bd=projectBreakdown(p); var hasTime=Object.keys(bd).some(function(k){return bd[k]>=1;});
-  if(hasTime || running){
-    var brk=document.createElement('div'); brk.className='pj-breakdown'; brk.dataset.pid=p.id;
-    brk.textContent='Time logged: '+breakdownStr(p);
-    block.appendChild(brk);
-  }
 
   // task cards
   var list=document.createElement('div'); list.className='pj2-list';
@@ -2761,12 +2752,6 @@ function projectTaskCard(p,t){
   PSTATUS.forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(t.status===o[0])op.selected=true; ss.appendChild(op); });
   ss.onchange=function(){ t.status=ss.value; save(); render(); };
   card.appendChild(ss);
-
-  // person
-  var as=document.createElement('select'); as.className='pj2-person';
-  [['griff','Griff'],['holly','Holly'],['hello','GMC']].forEach(function(o){ var op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if(t.assignee===o[0])op.selected=true; as.appendChild(op); });
-  as.onchange=function(){ t.assignee=as.value; saveLocal(); pushRemote(true); };
-  card.appendChild(as);
 
   // due
   var dd=document.createElement('button'); dd.className='pj2-due'+(t.due?(' '+fmtDue(t.due).cls):'');
